@@ -210,12 +210,31 @@ int main(int argc, char **argv)
     crest_profile(ref, rate, ref_crest);
 
     bool openhat = false, grid = false;
+    int cap = 0;
     for(int i = 2; i < argc; ++i)
     {
         if(!strcmp(argv[i], "--grid"))    grid = true;
         if(!strcmp(argv[i], "--openhat")) openhat = true;
+        if(!strcmp(argv[i], "--partials") && i+1 < argc) cap = atoi(argv[++i]);
     }
     HiHatSpec base = openhat ? kOpenHatSpec : kCymbalSpec;
+
+    /* Partial count is the CPU lever: every line is one sin() per sample. Keep
+     * the N LOUDEST (still in frequency order) and score what that costs. */
+    static Partial trimmed[64];
+    if(cap > 0 && cap < base.partialCount)
+    {
+        std::vector<Partial> v(base.partials, base.partials + base.partialCount);
+        std::vector<Partial> byamp = v;
+        std::sort(byamp.begin(), byamp.end(),
+                  [](const Partial &a, const Partial &b){ return a.amplitude > b.amplitude; });
+        const float cut = byamp[(size_t)cap - 1].amplitude;
+        int n = 0;
+        for(const Partial &p : v) if(p.amplitude >= cut && n < cap) trimmed[n++] = p;
+        base.partials = trimmed;
+        base.partialCount = n;
+        printf("partial cap: %d -> %d lines\n", (int)v.size(), n);
+    }
 
     struct Best { double score, band, env, crest; HiHatSpec spec; } best;
     best.score = 1e9;

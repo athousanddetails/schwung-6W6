@@ -15,6 +15,8 @@
 #include "Toms.hpp"
 
 #include "sd606_cymbal.h"
+#include "sd606_metal.h"
+#include "sd606_metal_voice.h"
 #include "sd606_engine.h"
 #include "sd606_params.h"
 #include "sd606_shape.h"
@@ -26,6 +28,11 @@ using namespace SynthDrums606;
 /* A choke is a 2 ms fade, not a hard stop — cutting a ringing open hat dead
  * puts a click on the front of the closed hat that follows it. */
 static const float kChokeSeconds = 0.002f;
+
+/* The hats on the shorter partial table — see sd606_metal.h for the measured
+ * justification. Built once at load, never on the audio thread. */
+static const HiHatSpec kClosedHatLite = SynthDrums606::sd606_lite(SynthDrums606::kClosedHatSpec);
+static const HiHatSpec kOpenHatLite   = SynthDrums606::sd606_lite(SynthDrums606::kOpenHatSpec);
 
 namespace {
 
@@ -119,7 +126,7 @@ struct sd606_engine {
     BassDrumVoice   bd;
     SnareVoice      sd;
     TomVoice        lt, ht;
-    MetalHiHatVoice ch, oh, cy;
+    Sd606MetalVoice ch, oh, cy;   /* forked: see sd606_metal_voice.h */
     ClapVoice       cp;
 };
 
@@ -256,8 +263,8 @@ void sd606_trigger(sd606_engine_t *e, int voice, int velocity)
         break;
     case SD606_LT: e->lt.trigger(kLowTomSpec,  decay, tune); break;
     case SD606_HT: e->ht.trigger(kHighTomSpec, decay, tune); break;
-    case SD606_CH: e->ch.trigger(kClosedHatSpec, decay, tune); break;
-    case SD606_OH: e->oh.trigger(kOpenHatSpec,   decay, tune); break;
+    case SD606_CH: e->ch.trigger(kClosedHatLite, decay, tune); break;
+    case SD606_OH: e->oh.trigger(kOpenHatLite,   decay, tune); break;
     case SD606_CY: e->cy.trigger(kCymbalSpec,    decay, tune); break;
     case SD606_CP: e->cp.trigger(decay, tune, e->potv[e->cp_noise]); break;
     default: break;
