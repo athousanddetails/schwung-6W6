@@ -24,6 +24,7 @@
 
 #include "HiHats.hpp"
 #include "sd606_cymbal.h"
+#include "sd606_metal_hw.h"
 using namespace SynthDrums606;
 
 /* ---- reference WAV (24-bit or 16-bit mono) ---- */
@@ -103,9 +104,12 @@ static void fft(std::vector<std::complex<double> > &a)
 static const double kBandLo = 120.0;      /* 1/3-octave from 120 Hz up */
 
 /* Mean spectrum over the whole hit, as 1/3-octave band energies in dB. */
-static void band_profile(const std::vector<float> &x, int rate, double *out)
+static void band_profile(const std::vector<float> &x_in, int rate, double *out)
 {
     const size_t N = 8192;
+    /* a 166 ms closed hat is shorter than one window: zero-pad, or the
+     * spectrum is empty and the score silently becomes envelope-only */
+    std::vector<float> x = x_in; if(x.size() < N + 1) x.resize(N + 1, 0.0f);
     double acc[NBANDS] = {0};
     int windows = 0;
     for(size_t off = 0; off + N < x.size(); off += N/2)
@@ -134,9 +138,12 @@ static void band_profile(const std::vector<float> &x, int rate, double *out)
 /* Within-band crest: peak bin over median bin, in dB, per 1/3-octave band.
  * This is what separates 64 resonant lines from filtered noise with the same
  * gross spectrum — the thing that makes a cymbal metal rather than a hiss. */
-static void crest_profile(const std::vector<float> &x, int rate, double *out)
+static void crest_profile(const std::vector<float> &x_in, int rate, double *out)
 {
     const size_t N = 8192;
+    /* a 166 ms closed hat is shorter than one window: zero-pad, or the
+     * spectrum is empty and the score silently becomes envelope-only */
+    std::vector<float> x = x_in; if(x.size() < N + 1) x.resize(N + 1, 0.0f);
     double acc[NBANDS] = {0};
     int windows = 0;
     for(size_t off = 0; off + N < x.size(); off += N)
@@ -211,13 +218,18 @@ int main(int argc, char **argv)
 
     bool openhat = false, grid = false;
     int cap = 0;
+    const char *voice = "cy";
     for(int i = 2; i < argc; ++i)
     {
         if(!strcmp(argv[i], "--grid"))    grid = true;
-        if(!strcmp(argv[i], "--openhat")) openhat = true;
+        if(!strcmp(argv[i], "--openhat")) openhat = true;          /* vendored OH spec: the yardstick */
         if(!strcmp(argv[i], "--partials") && i+1 < argc) cap = atoi(argv[++i]);
+        if(!strcmp(argv[i], "--voice") && i+1 < argc) voice = argv[++i];
     }
-    HiHatSpec base = openhat ? kOpenHatSpec : kCymbalSpec;
+    HiHatSpec base = openhat ? kOpenHatSpec
+                   : !strcmp(voice, "oh") ? kHwOpenHatSpec
+                   : !strcmp(voice, "ch") ? kHwClosedHatSpec
+                   : kCymbalSpec;
 
     /* Partial count is the CPU lever: every line is one sin() per sample. Keep
      * the N LOUDEST (still in frequency order) and score what that costs. */
@@ -246,10 +258,10 @@ int main(int argc, char **argv)
     /* Full range again: the metric changed, so the previous optimum tells us
      * nothing. Every axis extends past where the old search landed. */
     const float tonal[]  = { 0.06f, 0.11f, 0.18f, 0.28f, 0.42f, 0.60f };
-    const float noise[]  = { 1.10f, 1.30f, 1.50f, 1.75f };
-    const float hp[]     = { 5000.f, 6000.f, 6800.f, 7600.f };
-    const float lp[]     = { 13000.f, 16000.f, 19000.f, 21000.f };
-    const float sat[]    = { 0.60f, 0.80f, 1.00f, 1.25f };
+    const float noise[]  = { 0.50f, 0.70f, 0.91f, 1.10f, 1.30f, 1.50f };
+    const float hp[]     = { 3400.f, 4200.f, 5000.f, 6000.f, 6800.f, 7600.f };
+    const float lp[]     = { 12500.f, 16000.f, 19000.f };
+    const float sat[]    = { 0.30f, 0.45f, 0.60f, 0.80f, 1.00f };
 
     int tried = 0;
     if(grid) for(float t : tonal) for(float nz : noise) for(float h : hp)
@@ -287,6 +299,18 @@ int main(int argc, char **argv)
            best.spec.noiseLowPassHz, best.spec.saturationDrive);
     if(grid) printf("      spectral %.2f dB/band, envelope %.2f dB, crest %.2f dB, score %.2f\n",
            best.band, best.env, best.crest, best.score);
+    if(grid)
+    {
+        /* The metric cannot hear "the ting pokes out"; an owner can. Offer the
+         * best-by-metric and two progressively more tonal neighbours. */
+        printf("CANDIDATES (tonalMix noiseMix noiseHP noiseLP sat):\n");
+        printf("  A metric-best : %.3f %.3f %.0f %.0f %.2f\n", best.spec.tonalMix, best.spec.noiseMix,
+               best.spec.noiseHighPassHz, best.spec.noiseLowPassHz, best.spec.saturationDrive);
+        printf("  B more tonal  : %.3f %.3f %.0f %.0f %.2f\n", best.spec.tonalMix*1.8f, best.spec.noiseMix*0.85f,
+               best.spec.noiseHighPassHz, best.spec.noiseLowPassHz, best.spec.saturationDrive);
+        printf("  C most tonal  : %.3f %.3f %.0f %.0f %.2f\n", best.spec.tonalMix*3.0f, best.spec.noiseMix*0.7f,
+               best.spec.noiseHighPassHz, best.spec.noiseLowPassHz, best.spec.saturationDrive);
+    }
 
     HiHatSpec cur = base;
     std::vector<float> got = render(cur, rate, seconds);
@@ -295,7 +319,7 @@ int main(int argc, char **argv)
     double be = 0; for(int b = 0; b < NBANDS; ++b) be += fabs(gb[b] - ref_band[b]); be /= NBANDS;
     double ee = 0; for(int i = 0; i < NENV; ++i) ee += fabs(ge[i] - ref_env[i]); ee /= NENV;
     double ce = 0; for(int b = 0; b < NBANDS; ++b) ce += fabs(gc[b] - ref_crest[b]); ce /= NBANDS;
-    printf("\nCURRENT %s: spectral %.2f dB/band, envelope %.2f dB, crest %.2f dB, score %.2f\n",
+    printf("\nCURRENT %s voicing: spectral %.2f dB/band, envelope %.2f dB, crest %.2f dB, score %.2f\n",
            openhat ? "vendored kOpenHatSpec" : "sd606_cymbal.h", be, ee, ce,
            be + 0.5*ee + ce);
     return 0;
