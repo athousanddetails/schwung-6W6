@@ -7,6 +7,7 @@
     "author": "athousanddetails; voices after 606-Inspired-Synth-Drums (Matthew Fecher / AudioKit Pro)",
     "dsp": "dsp.so",
     "api_version": 2,
+    "component_type": "sound_generator",
     "min_host_version": "0.12.1",
     "capabilities": {
         "audio_out": true,
