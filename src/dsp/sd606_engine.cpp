@@ -43,7 +43,7 @@ const char *kVoiceIds[SD606_NUM_VOICES] = {
  * default) still lands under full scale rather than on top of it.
  *
  * Measured, not guessed: solo peaks at unity were bd 0.672, sd 0.847, lt 0.869,
- * ht 0.879, ch 0.920, oh 1.089, cy 0.980, cp 0.608.
+ * ht 0.879, ch 0.920, oh 1.089, cy 0.980, cp 0.608. The cymbal was re-trimmed after its spec was fitted.
  */
 static const float kVoiceTrim[SD606_NUM_VOICES] = {
     0.670f,   /* bd — loudest of the kit, as on the hardware */
@@ -52,7 +52,7 @@ static const float kVoiceTrim[SD606_NUM_VOICES] = {
     0.319f,   /* ht */
     0.228f,   /* ch */
     0.220f,   /* oh */
-    0.235f,   /* cy */
+    0.209f,   /* cy — re-measured after the cymbal was fitted */
     0.461f,   /* cp */
 };
 

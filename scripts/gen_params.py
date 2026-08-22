@@ -101,9 +101,9 @@ GLOBALS = [
     E("master_dist", "Master Dist", ["Off"] + DIST),
     P("master_drive", "Master Drive", 0.2, 8.0, EXP, 55),
     # 0.63 at centre-ish, not 0.8: a dense accented pattern peaks around
-    # -1.3 dBFS from here, so the kit leaves real headroom for whatever
+    # -1.1 dBFS from here, so the kit leaves real headroom for whatever
     # the chain puts after it instead of arriving already clipped.
-    P("volume", "Volume", 0.0, 1.0, LIN, 80),
+    P("volume", "Volume", 0.0, 1.0, LIN, 76),
     P("accent", "Accent", 1.0, 4.0, LIN, 42),               # 2.0x on accented hits
     E("hh_choke", "Choke", ["Off", "CH > OH", "Mutual"], 1),
     E("note_map", "Note Map", ["Drum Rack (36+)", "General MIDI"]),

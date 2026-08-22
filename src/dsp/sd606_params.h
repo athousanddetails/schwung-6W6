@@ -67,7 +67,7 @@ static const sd606_pot_t g_sd606_pots[SD606_NUM_POTS] = {
     { "cp_drive",     0.2000f,     8.0000f, SD606_EXP,  55 },
     { "cp_level",     0.0000f,     2.0000f, SD606_LIN,  64 },
     { "master_drive",     0.2000f,     8.0000f, SD606_EXP,  55 },
-    { "volume",     0.0000f,     1.0000f, SD606_LIN,  80 },
+    { "volume",     0.0000f,     1.0000f, SD606_LIN,  76 },
     { "accent",     1.0000f,     4.0000f, SD606_LIN,  42 },
 };
 
