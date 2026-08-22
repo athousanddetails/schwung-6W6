@@ -115,6 +115,16 @@ int main(int argc, char **argv)
     CHECK(atoi(buf) == 2, "enum hh_choke clamps to its last option");
     CHECK(api->get_param(inst, "no_such_key", buf, sizeof(buf)) < 0,
           "unknown key reports -1 rather than lying");
+    api->set_param(inst, "bd_decay", "3");
+    api->set_param(inst, "bd_decay", "default");
+    api->get_param(inst, "bd_decay", buf, sizeof(buf));
+    CHECK(atoi(buf) == 24, "set_param(key, \"default\") restores the fitted default (bd_decay 24)");
+    api->set_param(inst, "hh_choke", "default");
+    api->get_param(inst, "hh_choke", buf, sizeof(buf));
+    CHECK(atoi(buf) == 1, "\"default\" works for enums too (hh_choke CH > OH)");
+    api->get_param(inst, "chain_params", buf, sizeof(buf));
+    CHECK(strstr(buf, "\"key\":\"bd_decay\",\"name\":\"Decay\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":24") != NULL,
+          "chain_params advertises the fitted default for bd_decay");
 
     /* ---- silence when nothing is played ---- */
     CHECK(render_peak(40) < 0.0005, "silent with no triggers");

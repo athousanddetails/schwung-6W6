@@ -1,0 +1,556 @@
+{
+  "id": "6w6",
+  "name": "6W6",
+  "drum": {
+    "padCount": 16,
+    "padNoteStart": 36,
+    "rawMidi": false
+  },
+  "banks": [
+    {
+      "name": "Kick",
+      "rows": [
+        [
+          {
+            "key": "bd_tune",
+            "short": "TUNE",
+            "full": "Tune",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "bd_decay",
+            "short": "DECAY",
+            "full": "Decay",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "bd_attack",
+            "short": "ATTK",
+            "full": "Attack",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "bd_drift",
+            "short": "DRIFT",
+            "full": "Drift",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "bd_drive",
+            "short": "DRIVE",
+            "full": "Drive",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "bd_dist_type",
+            "short": "DIST",
+            "full": "Distortion",
+            "type": "enum",
+            "options": [
+              "Diode",
+              "Clip",
+              "Fold",
+              "Crush"
+            ]
+          },
+          {
+            "key": "bd_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Snare",
+      "rows": [
+        [
+          {
+            "key": "sd_tune",
+            "short": "TUNE",
+            "full": "Tune",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "sd_decay",
+            "short": "DECAY",
+            "full": "Decay",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "sd_snappy",
+            "short": "SNAPY",
+            "full": "Snappy",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "sd_tone",
+            "short": "TONE",
+            "full": "Tone",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "sd_drive",
+            "short": "DRIVE",
+            "full": "Drive",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "sd_dist_type",
+            "short": "DIST",
+            "full": "Distortion",
+            "type": "enum",
+            "options": [
+              "Diode",
+              "Clip",
+              "Fold",
+              "Crush"
+            ]
+          },
+          {
+            "key": "sd_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Lo Tom",
+      "rows": [
+        [
+          {
+            "key": "lt_tune",
+            "short": "TUNE",
+            "full": "Tune",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "lt_decay",
+            "short": "DECAY",
+            "full": "Decay",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "lt_drive",
+            "short": "DRIVE",
+            "full": "Drive",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "lt_dist_type",
+            "short": "DIST",
+            "full": "Distortion",
+            "type": "enum",
+            "options": [
+              "Diode",
+              "Clip",
+              "Fold",
+              "Crush"
+            ]
+          },
+          {
+            "key": "lt_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          null,
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Hi Tom",
+      "rows": [
+        [
+          {
+            "key": "ht_tune",
+            "short": "TUNE",
+            "full": "Tune",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "ht_decay",
+            "short": "DECAY",
+            "full": "Decay",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "ht_drive",
+            "short": "DRIVE",
+            "full": "Drive",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "ht_dist_type",
+            "short": "DIST",
+            "full": "Distortion",
+            "type": "enum",
+            "options": [
+              "Diode",
+              "Clip",
+              "Fold",
+              "Crush"
+            ]
+          },
+          {
+            "key": "ht_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          null,
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Cl Hat",
+      "rows": [
+        [
+          {
+            "key": "ch_tune",
+            "short": "TUNE",
+            "full": "Tune",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "ch_decay",
+            "short": "DECAY",
+            "full": "Decay",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "ch_drive",
+            "short": "DRIVE",
+            "full": "Drive",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "ch_dist_type",
+            "short": "DIST",
+            "full": "Distortion",
+            "type": "enum",
+            "options": [
+              "Diode",
+              "Clip",
+              "Fold",
+              "Crush"
+            ]
+          },
+          {
+            "key": "ch_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "hh_choke",
+            "short": "CHOKE",
+            "full": "Choke",
+            "type": "enum",
+            "options": [
+              "Off",
+              "CH > OH",
+              "Mutual"
+            ]
+          },
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Op Hat",
+      "rows": [
+        [
+          {
+            "key": "oh_tune",
+            "short": "TUNE",
+            "full": "Tune",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "oh_decay",
+            "short": "DECAY",
+            "full": "Decay",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "oh_drive",
+            "short": "DRIVE",
+            "full": "Drive",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "oh_dist_type",
+            "short": "DIST",
+            "full": "Distortion",
+            "type": "enum",
+            "options": [
+              "Diode",
+              "Clip",
+              "Fold",
+              "Crush"
+            ]
+          },
+          {
+            "key": "oh_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          null,
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Cymbal",
+      "rows": [
+        [
+          {
+            "key": "cy_tune",
+            "short": "TUNE",
+            "full": "Tune",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "cy_decay",
+            "short": "DECAY",
+            "full": "Decay",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "cy_drive",
+            "short": "DRIVE",
+            "full": "Drive",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "cy_dist_type",
+            "short": "DIST",
+            "full": "Distortion",
+            "type": "enum",
+            "options": [
+              "Diode",
+              "Clip",
+              "Fold",
+              "Crush"
+            ]
+          },
+          {
+            "key": "cy_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          null,
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Clap",
+      "rows": [
+        [
+          {
+            "key": "cp_tune",
+            "short": "TUNE",
+            "full": "Tune",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "cp_decay",
+            "short": "DECAY",
+            "full": "Decay",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "cp_noise",
+            "short": "NOISE",
+            "full": "Noise",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "cp_drive",
+            "short": "DRIVE",
+            "full": "Drive",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "cp_dist_type",
+            "short": "DIST",
+            "full": "Distortion",
+            "type": "enum",
+            "options": [
+              "Diode",
+              "Clip",
+              "Fold",
+              "Crush"
+            ]
+          },
+          {
+            "key": "cp_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Master",
+      "global": true,
+      "rows": [
+        [
+          {
+            "key": "master_dist",
+            "short": "MDIST",
+            "full": "Master Dist",
+            "type": "enum",
+            "options": [
+              "Off",
+              "Diode",
+              "Clip",
+              "Fold",
+              "Crush"
+            ]
+          },
+          {
+            "key": "master_drive",
+            "short": "MDRV",
+            "full": "Master Drive",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "volume",
+            "short": "VOL",
+            "full": "Volume",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "accent",
+            "short": "ACNT",
+            "full": "Accent",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "hh_choke",
+            "short": "CHOKE",
+            "full": "Choke",
+            "type": "enum",
+            "options": [
+              "Off",
+              "CH > OH",
+              "Mutual"
+            ]
+          },
+          {
+            "key": "note_map",
+            "short": "NMAP",
+            "full": "Note Map",
+            "type": "enum",
+            "options": [
+              "Rack",
+              "GM"
+            ]
+          },
+          null,
+          null
+        ]
+      ]
+    }
+  ]
+}

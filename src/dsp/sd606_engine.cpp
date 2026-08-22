@@ -322,10 +322,14 @@ void sd606_render(sd606_engine_t *e, float *out, int frames)
 
 int sd606_set_param(sd606_engine_t *e, const char *key, const char *val)
 {
+    /* "default" resets a control to its fitted default. The kit's defaults
+     * are not centred (they are fitted against a hardware 606), so a UI that
+     * wants a reset gesture must not guess 64 — it asks. */
+    const int reset = !strcmp(val, "default");
     const int slot = find_pot(key);
     if(slot >= 0)
     {
-        int p = (int)(atof(val) + 0.5f);
+        int p = reset ? g_sd606_pots[slot].def : (int)(atof(val) + 0.5f);
         if(p < 0) p = 0;
         if(p > 127) p = 127;                 /* clamp, never wrap */
         e->pot[slot]  = p;
@@ -335,7 +339,7 @@ int sd606_set_param(sd606_engine_t *e, const char *key, const char *val)
     const int es = find_enum(key);
     if(es >= 0)
     {
-        int v = (int)(atof(val) + 0.5f);
+        int v = reset ? g_sd606_enums[es].def : (int)(atof(val) + 0.5f);
         if(v < 0) v = 0;
         if(v >= g_sd606_enums[es].count) v = g_sd606_enums[es].count - 1;
         e->env[es] = v;

@@ -1,0 +1,85 @@
+{
+  "title": "6W6",
+  "children": [
+    {
+      "title": "Overview",
+      "lines": [
+        "TR-606 style drum",
+        "machine. Every",
+        "voice synthesized,",
+        "no samples - kick,",
+        "snare, toms, hats,",
+        "cymbal, plus a clap.",
+        "Fitted to a real 606."
+      ]
+    },
+    {
+      "title": "Playing",
+      "lines": [
+        "Pads (left 4x4):",
+        " row1: BD SD LT HT",
+        " row2: CH OH CY CP",
+        " pad16: Master pg",
+        "",
+        "Shift+Pad: select",
+        " without sounding.",
+        "Mute+Pad: mute that",
+        " drum ([M] in bar)."
+      ]
+    },
+    {
+      "title": "Editing",
+      "lines": [
+        "Knobs 1-8 edit the",
+        "visible page.",
+        "Jog: change page.",
+        "All pots are 0-127;",
+        "centre = the 606.",
+        "",
+        "Every voice: Tune,",
+        "Decay, Drive, Dist",
+        "(Diode/Clip/Fold/",
+        "Crush), Level."
+      ]
+    },
+    {
+      "title": "Hats",
+      "lines": [
+        "Choke (Cl Hat page",
+        "and Master):",
+        " Off - hats ring",
+        "  over each other",
+        " CH > OH - closed",
+        "  cuts open (606)",
+        " Mutual - either",
+        "  cuts the other"
+      ]
+    },
+    {
+      "title": "Sequencing",
+      "lines": [
+        "Use Move's own",
+        "sequencer: drum",
+        "track with a kit,",
+        "mute it (HiJack),",
+        "set track MIDI OUT",
+        "to the slot channel.",
+        "Each drum = one",
+        "lane. Note map:",
+        "drum rack 36-43",
+        "(or GM, switchable)."
+      ]
+    },
+    {
+      "title": "Remote UI",
+      "lines": [
+        "Full panel in the",
+        "browser:",
+        "move.local:7700",
+        " /remote-ui",
+        "Drag knobs, mute",
+        "buttons per drum."
+      ]
+    }
+  ]
+}

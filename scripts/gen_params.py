@@ -141,6 +141,9 @@ def chain_param(p):
     else:
         d = {"key": p["key"], "name": p["name"], "type": "int",
              "min": 0, "max": 127}
+    # The fitted default, so a reset gesture (stock Mute+knob, Movy, the web
+    # panel's double-click) lands on the 606 and not on a guessed 64.
+    d["default"] = p["default"]
     v = viz_for(p)
     if v is not None:
         d["viz"] = v
@@ -241,6 +244,39 @@ static const char sd606_ui_pages_json[] =
 
 #endif /* SD606_PARAMS_H */
 """)
-print(f"chain_params {len(cpj)}B  ui_pages {len(uhj)}B  "
+# ---- movy_config.json: same source, Movy's shape. ---------------------------
+# HARD RULE (cost a debugging session on Tablor): a Movy bank is EXACTLY ONE
+# PAGE. buildConfigPages keys bankGroups per BANK but the UI indexes per PAGE,
+# so a multi-row bank shifts every following page's label. One row per bank.
+SHORT = {"Tune": "TUNE", "Decay": "DECAY", "Attack": "ATTK", "Drift": "DRIFT",
+         "Drive": "DRIVE", "Distortion": "DIST", "Level": "LEVEL",
+         "Snappy": "SNAPY", "Tone": "TONE", "Noise": "NOISE", "Choke": "CHOKE",
+         "Master Dist": "MDIST", "Master Drive": "MDRV", "Volume": "VOL",
+         "Accent": "ACNT", "Note Map": "NMAP"}
+MOVY_NAME = {"bd": "Kick", "sd": "Snare", "lt": "Lo Tom", "ht": "Hi Tom",
+             "ch": "Cl Hat", "oh": "Op Hat", "cy": "Cymbal", "cp": "Clap"}
+def movy_slot(p):
+    d = {"key": p["key"], "short": SHORT[p["name"]], "full": p["name"]}
+    if p["kind"] == "enum":
+        d["type"] = "enum"
+        # Movy squeezes option text into a 32 px cell: short words only.
+        d["options"] = [o.replace("Hard Clip", "Clip").replace("Wavefolder", "Fold")
+                         .replace("Bitcrush", "Crush").replace("Drum Rack (36+)", "Rack")
+                         .replace("General MIDI", "GM") for o in p["options"]]
+    else:
+        d["type"] = "int"; d["min"] = 0; d["max"] = 127
+    return d
+banks = []
+for pid, label, params in PAGES:
+    row = [movy_slot(p) for p in params] + [None] * (8 - len(params))
+    banks.append({"name": MOVY_NAME[pid], "rows": [row]})
+banks.append({"name": "Master", "global": True,
+              "rows": [[movy_slot(p) for p in GLOBALS] + [None] * (8 - len(GLOBALS))]})
+movy = {"id": "6w6", "name": "6W6",
+        "drum": {"padCount": 16, "padNoteStart": 36, "rawMidi": False},
+        "banks": banks}
+(root_dir / "src/movy_config.json").write_text(json.dumps(movy, indent=2) + "\n")
+
+print(f"chain_params {len(cpj)}B  ui_pages {len(uhj)}B  movy banks={len(banks)}  "
       f"pages={len(levels)}  pots={len(pots)}  enums={len(enums)}  "
       f"params={len(cp)}")

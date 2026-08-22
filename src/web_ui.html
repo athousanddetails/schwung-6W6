@@ -1,0 +1,256 @@
+<!doctype html>
+<!--
+  6W6 remote panel — served by schwung-manager at /remote-ui when 6W6 is the
+  slot's synth. Talks to the device through the schwungRemote postMessage
+  bridge; every continuous control is a 0-127 pot, mirroring the hardware.
+
+  Panel look after the TR-606's silver-grey face and its orange/red legend.
+  Structure ported from 9W9's panel (GPL-3.0). GPL-3.0.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>6W6</title>
+<style>
+  :root {
+    --panel:  #c9c9c4;   /* 606 silver-grey */
+    --dark:   #151515;
+    --accent: #e8541e;   /* 606 orange-red legend */
+    --line:   #8c8c88;
+    --knob:   #262626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f0f; font-family: "Helvetica Neue", Arial, sans-serif;
+         padding: 14px; color: var(--dark); }
+  .machine { max-width: 1180px; margin: 0 auto; background: var(--panel);
+             border: 3px solid #000; border-radius: 8px; padding: 12px 14px; }
+  .titlebar { display: flex; align-items: baseline; justify-content: space-between;
+              border-bottom: 4px solid var(--accent); padding-bottom: 6px;
+              margin-bottom: 10px; }
+  .titlebar h1 { font-size: 26px; letter-spacing: 3px; font-weight: 900; }
+  .titlebar h1 span { color: var(--accent); }
+  .titlebar .sub { font-size: 11px; letter-spacing: 2px; color: #444; }
+  .sections { display: flex; flex-wrap: wrap; gap: 10px; }
+  .section { background: #d8d8d3; border: 2px solid #000; border-radius: 5px;
+             padding: 8px 8px 6px; flex: 1 1 200px; min-width: 200px; }
+  .section.master { background: #262626; color: #eee; }
+  .sec-head { display: flex; justify-content: space-between; align-items: center;
+              background: var(--accent); color: #fff; font-weight: 800;
+              font-size: 12px; letter-spacing: 2px; padding: 3px 6px;
+              border: 1px solid #000; margin-bottom: 8px; }
+  .section.master .sec-head { background: #777; }
+  .mute { width: 26px; height: 15px; border: 1px solid #000; background: #ddd;
+          color: #000; cursor: pointer; font-size: 9px; font-weight: 700;
+          line-height: 13px; text-align: center; user-select: none; }
+  .mute.on { background: #d22; color: #fff; }
+  .knobs { display: flex; flex-wrap: wrap; gap: 6px 4px; }
+  .cell { width: 60px; text-align: center; }
+  .dial { width: 44px; height: 44px; margin: 0 auto; border-radius: 50%;
+          background: radial-gradient(circle at 35% 30%, #4a4a4a, var(--knob) 70%);
+          border: 2px solid #000; position: relative; cursor: ns-resize;
+          touch-action: none; }
+  .dial .ptr { position: absolute; left: 50%; top: 50%; width: 3px; height: 17px;
+               background: #f2f2f2; transform-origin: 50% 0%; border-radius: 2px; }
+  .cell label { display: block; font-size: 9.5px; font-weight: 700;
+                letter-spacing: .5px; margin-top: 3px; text-transform: uppercase; }
+  .cell .val { font-size: 10px; color: #555; }
+  .section.master .cell .val { color: #bbb; }
+  select { width: 58px; height: 44px; border: 2px solid #000; border-radius: 5px;
+           background: #ddd; font-weight: 700; font-size: 10px; text-align: center; }
+  .footer { margin-top: 10px; font-size: 10px; color: #555;
+            display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="machine">
+  <div class="titlebar">
+    <h1>6W6 <span>DRUMATIX</span></h1>
+    <div class="sub">ALL SYNTHESIZED &middot; SCHWUNG</div>
+  </div>
+  <div class="sections" id="sections"></div>
+  <div class="footer">
+    <div>drag knobs vertically &middot; double-click to reset</div>
+    <div>by athousanddetails &middot; voices after 606-Inspired-Synth-Drums (MIT)</div>
+  </div>
+</div>
+
+<script src="/static/schwung-remote-api.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var DIST  = ["Diode", "Clip", "Fold", "Crush"];
+  var MDIST = ["Off", "Diode", "Clip", "Fold", "Crush"];
+  var CHOKE = ["Off", "CH > OH", "Mutual"];
+
+  function pot(k, n)      { return { k: k, n: n }; }
+  function en(k, n, opts) { return { k: k, n: n, opts: opts }; }
+
+  /* Every voice: Tune, Decay, [voice extras], Drive, Dist, Level — the same
+   * shape as the on-device pages (gen_params.py is the source of both). */
+  function voice(id, extras) {
+    return [ pot(id+"_tune","Tune"), pot(id+"_decay","Decay") ]
+      .concat(extras || [])
+      .concat([ pot(id+"_drive","Drive"), en(id+"_dist_type","Dist",DIST),
+                pot(id+"_level","Level") ]);
+  }
+
+  /* lane = bit in synth:mutes; -1 = no mute button */
+  var SECTIONS = [
+    { name: "BASS DRUM",  lane: 0, knobs: voice("bd", [pot("bd_attack","Attack"), pot("bd_drift","Drift")]) },
+    { name: "SNARE DRUM", lane: 1, knobs: voice("sd", [pot("sd_snappy","Snappy"), pot("sd_tone","Tone")]) },
+    { name: "LOW TOM",    lane: 2, knobs: voice("lt") },
+    { name: "HI TOM",     lane: 3, knobs: voice("ht") },
+    { name: "CLOSED HAT", lane: 4, knobs: voice("ch").concat([en("hh_choke","Choke",CHOKE)]) },
+    { name: "OPEN HAT",   lane: 5, knobs: voice("oh") },
+    { name: "CYMBAL",     lane: 6, knobs: voice("cy") },
+    { name: "HAND CLAP",  lane: 7, knobs: voice("cp", [pot("cp_noise","Noise")]) },
+    { name: "MASTER", lane: -1, master: true, knobs: [
+        en("master_dist","Dist",MDIST), pot("master_drive","Drive"),
+        pot("volume","Volume"), pot("accent","Accent"),
+        en("hh_choke","Choke",CHOKE),
+        en("note_map","Notes",["DrumRack","GM"]) ] }
+  ];
+
+  var state = {};        /* key -> value */
+  var widgets = {};      /* key -> [update fn] (hh_choke appears twice) */
+  var mutesMask = 0;
+  var muteBtns = {};
+
+  function key(k) { return "synth:" + k; }
+
+  function send(k, v) {
+    state[k] = v;
+    schwungRemote.setParam(key(k), String(v));
+    /* mirror the same key's other widget (Choke is on two sections) */
+    (widgets[k] || []).forEach(function (fn) { fn(v); });
+  }
+
+  function addWidget(k, fn) { (widgets[k] = widgets[k] || []).push(fn); }
+
+  function makeDial(cell, kn) {
+    var dial = document.createElement("div"); dial.className = "dial";
+    var ptr = document.createElement("div"); ptr.className = "ptr";
+    dial.appendChild(ptr);
+    var val = document.createElement("div"); val.className = "val";
+    val.textContent = "0";
+
+    function render(v) {
+      var ang = -135 + (v / 127) * 270;
+      ptr.style.transform = "translate(-50%,0) rotate(" + (ang + 180) + "deg)";
+      val.textContent = v;
+    }
+    addWidget(kn.k, render);
+
+    var dragY = null, dragV = 0;
+    function move(e) {
+      if (dragY === null) return;
+      var y = (e.touches ? e.touches[0].clientY : e.clientY);
+      var v = Math.max(0, Math.min(127, Math.round(dragV + (dragY - y) * 0.7)));
+      if (v !== state[kn.k]) { render(v); send(kn.k, v); }
+      e.preventDefault();
+    }
+    function up() { dragY = null;
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", up); }
+    function down(e) {
+      dragY = (e.touches ? e.touches[0].clientY : e.clientY);
+      dragV = state[kn.k] | 0;
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+      window.addEventListener("touchmove", move, { passive: false });
+      window.addEventListener("touchend", up);
+      e.preventDefault();
+    }
+    dial.addEventListener("mousedown", down);
+    dial.addEventListener("touchstart", down, { passive: false });
+    /* double-click resets to the DSP's own default, not a blind 64: the
+     * kit's defaults are fitted against a real 606 and most are not centred */
+    dial.addEventListener("dblclick", function () {
+      schwungRemote.setParam(key(kn.k), "default");
+      setTimeout(function () {
+        schwungRemote.getParam(key(kn.k)).then(function (v) { apply(kn.k, v); });
+      }, 120);
+    });
+
+    cell.appendChild(dial); cell.appendChild(val);
+    render(0);
+  }
+
+  function makeEnum(cell, kn) {
+    var sel = document.createElement("select");
+    kn.opts.forEach(function (o, i) {
+      var op = document.createElement("option");
+      op.value = i; op.textContent = o; sel.appendChild(op);
+    });
+    sel.addEventListener("change", function () { send(kn.k, sel.value | 0); });
+    addWidget(kn.k, function (v) { sel.value = Math.min(v, kn.opts.length - 1); });
+    cell.appendChild(sel);
+  }
+
+  var root = document.getElementById("sections");
+  SECTIONS.forEach(function (sec) {
+    var box = document.createElement("div");
+    box.className = "section" + (sec.master ? " master" : "");
+    var head = document.createElement("div"); head.className = "sec-head";
+    var title = document.createElement("span"); title.textContent = sec.name;
+    head.appendChild(title);
+    if (sec.lane >= 0) {
+      var mb = document.createElement("div");
+      mb.className = "mute"; mb.textContent = "MUTE";
+      mb.addEventListener("click", function () {
+        mutesMask = (mutesMask ^ (1 << sec.lane)) & 0xFF;
+        schwungRemote.setParam(key("mutes"), String(mutesMask));
+        renderMutes();
+      });
+      muteBtns[sec.lane] = mb;
+      head.appendChild(mb);
+    }
+    box.appendChild(head);
+    var grid = document.createElement("div"); grid.className = "knobs";
+    sec.knobs.forEach(function (kn) {
+      var cell = document.createElement("div"); cell.className = "cell";
+      if (kn.opts) makeEnum(cell, kn); else makeDial(cell, kn);
+      var lab = document.createElement("label"); lab.textContent = kn.n;
+      cell.appendChild(lab);
+      grid.appendChild(cell);
+    });
+    box.appendChild(grid);
+    root.appendChild(box);
+  });
+
+  function renderMutes() {
+    Object.keys(muteBtns).forEach(function (lane) {
+      muteBtns[lane].className = "mute" + ((mutesMask >> lane) & 1 ? " on" : "");
+    });
+  }
+
+  function apply(k, raw) {
+    var v = parseInt(raw, 10);
+    if (isNaN(v)) return;
+    if (k === "mutes") { mutesMask = v; renderMutes(); return; }
+    if (widgets[k]) { state[k] = v; widgets[k].forEach(function (fn) { fn(v); }); }
+  }
+
+  schwungRemote.onParamChange(function (params) {
+    Object.keys(params).forEach(function (full) {
+      if (full.indexOf("synth:") === 0) apply(full.substring(6), params[full]);
+    });
+  });
+
+  /* Seed everything once the bridge has state. */
+  function seed() {
+    Object.keys(widgets).concat(["mutes"]).forEach(function (k) {
+      schwungRemote.getParam(key(k)).then(function (v) {
+        if (v !== undefined && v !== null && v !== "") apply(k, v);
+      });
+    });
+  }
+  setTimeout(seed, 400);
+  setTimeout(seed, 1500);
+})();
+</script>
+</body>
+</html>

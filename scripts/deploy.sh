@@ -30,6 +30,13 @@ done
 # Atomic swap. Do NOT replace this with a direct scp.
 ssh "$HOST" "cd $DEST && for f in *.new; do mv -f \"\$f\" \"\${f%.new}\"; done && chmod 755 dsp.so && ls -l"
 
+# The chain patch: gives the slot its capture rule (step buttons -> the
+# built-in sequencer) so the editor works the moment 6W6 is picked.
+if [ -f "$SRC/src/patches/6W6.json" ]; then
+    scp -q "$SRC/src/patches/6W6.json" "$HOST:/data/UserData/schwung/patches/6W6.json.new"
+    ssh "$HOST" "cd /data/UserData/schwung/patches && mv -f 6W6.json.new 6W6.json"
+fi
+
 # Prove what landed rather than assuming it did.
 LOCAL_MD5=$(md5 -q "$BUILD" 2>/dev/null || md5sum "$BUILD" | cut -d' ' -f1)
 REMOTE_MD5=$(ssh "$HOST" "md5sum $DEST/dsp.so | cut -d' ' -f1")
