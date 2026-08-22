@@ -132,6 +132,12 @@ def fit(path, max_partials=64, windows=6, size=16384, persist=0.5,
 
     need = max(2, int(math.ceil(windows * persist)))
     kept = [e for e in seen if e[2] >= need]
+    # Amplitude = the line's MAX across windows. Two alternatives were tried
+    # against the hardware cymbal and both scored worse through the real
+    # engine (kit_check, same voicing): mean-over-windows buried the 7200 Hz
+    # ting that dominates the hit (fast-decaying lines have a low mean; the
+    # top six became 1.2-3.7 kHz body lines), and onset-window amplitude
+    # scored 12.8 vs 10.6. Max is what ships; change it only with a number.
     kept.sort(key=lambda e: -max(e[1]))
     kept = kept[:max_partials]
     kept.sort(key=lambda e: e[0])

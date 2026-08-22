@@ -49,6 +49,11 @@ def RATIO(v, label="Tune"): return P(f"{v}_tune", label, 0.5, 2.0, EXP, 64)
 def DECAY(v, default): return P(f"{v}_decay", "Decay", 0.0, 1.0, LIN, default)
 
 # ---- Pages. One page per voice, in TR-606 front-panel order. --------------
+# DEFAULTS are fitted, not chosen: tools/fit_defaults.cpp searches each voice's
+# pots against the matching hardware recording through the real engine. Decays
+# and the kick/snare come from that. Tune pots stay at 64 wherever measured
+# pitch already matched the hardware -- the fitter will trade pitch for
+# spectral fill, and pitch is the one thing we can measure directly.
 # The 606's own roster is BD/SD/LT/HT/CY/OH/CH. Clap is the one addition —
 # the 606 never had one, but the repo ships an RD-6 fitted clap and a spare
 # pad is a spare pad.
@@ -56,38 +61,44 @@ PAGES = [
     ("bd", "Bass Drum", [
         # BassDrumVoice::trigger(transient, decay, tuningSemitones, variation).
         # Tuning is in semitones, centred on the repo's fitted 2.22.
-        P("bd_tune",    "Tune",    -9.78, 14.22, LIN, 64),
-        DECAY("bd", 102),                                   # 0.80
-        P("bd_attack",  "Attack",   0.0,  1.0,  LIN, 38),   # transient amount, 0.30
+        # Defaults FITTED against a hardware 606 kick (tools/fit_defaults,
+        # 2720 renders): the upstream defaults are its "XL 608" kick, which
+        # rings 9x longer than a 606 (-20 dB at 770 ms vs 85 ms). Score vs the
+        # recording 20.3 -> 7.7. Tune -2.2 st, decay 0.19, attack 0.94.
+        P("bd_tune",    "Tune",    -9.78, 14.22, LIN, 40),
+        DECAY("bd", 24),
+        P("bd_attack",  "Attack",   0.0,  1.0,  LIN, 120),  # transient amount
         P("bd_drift",   "Drift",    0.0,  1.0,  LIN, 0),    # per-hit pitch variation
         DRIVE("bd"), DTYPE("bd"), LEVEL("bd"),
     ]),
     ("sd", "Snare", [
         # SnareVoice::trigger(decay, bodyPitchRatio, snappy, noiseColorRatio)
-        RATIO("sd"),
-        DECAY("sd", 102),
-        P("sd_snappy",  "Snappy",   0.0,  1.0,  LIN, 95),   # wire level only
-        P("sd_tone",    "Tone",     0.5,  2.0,  EXP, 64),   # noise colour ratio
+        # Defaults FITTED against the hardware snare (1680 renders, score
+        # 11.3 -> 8.4): a touch sharper, shorter, less wire, darker wire.
+        P("sd_tune",    "Tune",     0.5,  2.0,  EXP, 70),
+        DECAY("sd", 76),
+        P("sd_snappy",  "Snappy",   0.0,  1.0,  LIN, 64),   # wire level only
+        P("sd_tone",    "Tone",     0.5,  2.0,  EXP, 52),   # noise colour ratio
         DRIVE("sd"), DTYPE("sd"), LEVEL("sd"),
     ]),
     ("lt", "Low Tom", [
-        RATIO("lt"), DECAY("lt", 102), DRIVE("lt"), DTYPE("lt"), LEVEL("lt"),
+        RATIO("lt"), DECAY("lt", 124), DRIVE("lt"), DTYPE("lt"), LEVEL("lt"),   # decay fitted vs hardware
     ]),
     ("ht", "Hi Tom", [
-        RATIO("ht"), DECAY("ht", 102), DRIVE("ht"), DTYPE("ht"), LEVEL("ht"),
+        RATIO("ht"), DECAY("ht", 124), DRIVE("ht"), DTYPE("ht"), LEVEL("ht"),   # decay fitted vs hardware
     ]),
     ("ch", "Closed Hat", [
-        RATIO("ch"), DECAY("ch", 89),                       # 0.70
+        RATIO("ch"), DECAY("ch", 116),                      # decay fitted vs hardware (was 0.70)
         DRIVE("ch"), DTYPE("ch"), LEVEL("ch"),
         # Lives here as well as on Master: this is where you are standing when
         # you want it. The 606 hardwires CH>OH; here it is a switch.
         E("hh_choke", "Choke", ["Off", "CH > OH", "Mutual"], 1),
     ]),
     ("oh", "Open Hat", [
-        RATIO("oh"), DECAY("oh", 102), DRIVE("oh"), DTYPE("oh"), LEVEL("oh"),
+        RATIO("oh"), DECAY("oh", 64), DRIVE("oh"), DTYPE("oh"), LEVEL("oh"),    # decay fitted vs hardware
     ]),
     ("cy", "Cymbal", [
-        RATIO("cy"), DECAY("cy", 102), DRIVE("cy"), DTYPE("cy"), LEVEL("cy"),
+        RATIO("cy"), DECAY("cy", 120), DRIVE("cy"), DTYPE("cy"), LEVEL("cy"),   # decay fitted vs hardware
     ]),
     ("cp", "Clap", [
         # ClapVoice::trigger(decay, pitchRatio, noiseAmount); 0.5 is the fit.

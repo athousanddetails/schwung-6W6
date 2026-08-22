@@ -50,17 +50,18 @@ const char *kVoiceIds[SD606_NUM_VOICES] = {
  * default) still lands under full scale rather than on top of it.
  *
  * Measured, not guessed: solo peaks at unity were bd 0.672, sd 0.847, lt 0.869,
- * ht 0.879, ch 0.920, oh 1.089, cy 0.980, cp 0.608. The cymbal was re-trimmed after its spec was fitted.
+ * ht 0.879, ch 0.920, oh 1.089, cy 0.980, cp 0.608; re-measured after the default pots were fitted against the hardware kit
+ * (the kick especially: short and clicky now, not the XL tail).
  */
 static const float kVoiceTrim[SD606_NUM_VOICES] = {
-    0.670f,   /* bd — loudest of the kit, as on the hardware */
-    0.378f,   /* sd */
-    0.322f,   /* lt */
-    0.319f,   /* ht */
-    0.228f,   /* ch */
-    0.220f,   /* oh */
-    0.209f,   /* cy — re-measured after the cymbal was fitted */
-    0.461f,   /* cp */
+    0.751f,   /* bd — loudest of the kit, as on the hardware */
+    0.446f,   /* sd */
+    0.308f,   /* lt */
+    0.309f,   /* ht */
+    0.218f,   /* ch */
+    0.224f,   /* oh */
+    0.215f,   /* cy — re-measured after the cymbal was fitted */
+    0.460f,   /* cp */
 };
 
 /* Per-voice pot/enum slots, resolved once at create time so the audio path
@@ -419,3 +420,7 @@ void sd606_deserialize(sd606_engine_t *e, const char *json)
     if(mp) { mp = strchr(mp, ':'); if(mp) e->mutes = (unsigned)strtoul(mp + 1, NULL, 10)
                                                      & ((1u << SD606_NUM_VOICES) - 1u); }
 }
+
+/* Read-only view of the kit balance, for the trim-measurement probe in
+ * tools/. Not part of the plugin surface. */
+extern "C" const float *sd606_debug_trim(void) { return kVoiceTrim; }
