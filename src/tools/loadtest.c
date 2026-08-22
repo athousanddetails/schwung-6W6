@@ -107,7 +107,7 @@ int main(int argc, char **argv)
     api->set_param(inst, "oh_decay", "-5");
     api->get_param(inst, "oh_decay", buf, sizeof(buf));
     CHECK(atoi(buf) == 0, "pot oh_decay clamps -5 -> 0");
-    api->set_param(inst, "oh_decay", "64");    /* clamp tests must not leak into
+    api->set_param(inst, "oh_decay", "102");   /* clamp tests must not leak into
                                                   the behavioural ones below */
     api->set_param(inst, "bd_tune", "64");
     api->set_param(inst, "hh_choke", "9");
@@ -221,7 +221,7 @@ int main(int argc, char **argv)
         CHECK(unchoked > free_tail * 0.5, msg);
 
         api->set_param(inst, "hh_choke", "1");
-        api->set_param(inst, "ch_decay", "116");
+        api->set_param(inst, "ch_decay", "102");
     }
     render_peak(900);
 

@@ -81,11 +81,23 @@ static constexpr int kCymbalPartialCount = 32;
 static constexpr HiHatSpec kCymbalSpec = {
     kCymbalPartials,
     kCymbalPartialCount,
-    6000.0f,             // noiseHighPassHz    FITTED by resynthesis
-    19000.0f,            // noiseLowPassHz     (all four; re-fitted against
-    0.110f,              // tonalMix            the clean sample)
-    1.300f,              // noiseMix
-    0.800f,              // saturationDrive
+    3400.0f,             // noiseHighPassHz      voicing FITTED by resynthesis
+    16000.0f,            // noiseLowPassHz       (tools/cymbal_tune.cpp) against
+    0.420f,              // tonalMix             the clean recording, then the
+    1.800f,              // noiseMix             owner chose by ear between the
+    0.60f,               // saturationDrive      metric-best and two more-metal
+                         //                      neighbours; this is metric-best.
+                         //
+                         // An FFT hands you partials and an envelope, not the
+                         // balance between metal and noise, so these five were
+                         // searched against three measures of the hardware hit:
+                         // 1/3-octave spectrum, decay envelope, and within-band
+                         // CREST. The crest term is load-bearing: scored on
+                         // spectrum alone the search deletes the metal (coarse
+                         // bands cannot tell 32 resonant lines from shaped
+                         // noise). An earlier, noisier voicing (tonal 0.11,
+                         // noise 1.30) scored 8.17 on that measure; this one
+                         // 6.71, with the refine landscape flat around it.
     1.30f,               // outputTrim
     0.0006f,             // attackTimeConstantSeconds
     0.22f,               // clickAmount — less click than a hat
@@ -93,12 +105,16 @@ static constexpr HiHatSpec kCymbalSpec = {
     0.55f,               // bellAccentAmount — the ting is the cymbal's whole
     0.120f,              // bellAccentDecaySeconds   identity, so it lingers
     0.750f,              // envelopeFastWeight  \ MEASURED off the clean hit by
-    0.018f,              // fastDecaySeconds    | a two-exponential fit
-    0.180f,              // slowDecaySeconds    / (residual 0.027)
+    0.0225f,             // fastDecaySeconds    | a two-exponential fit
+    0.225f,              // slowDecaySeconds    / (residual 0.027) — 0.018 /
+                         //                        0.180 s, divided by 0.8
     true,                // decayScalesTimeConstants — the knob shortens the
                          // actual ring, not just the gate
-    1.1768f,             // referenceDurationSeconds — MEASURED length after
-                         // onset (51898 frames / 44100); -60 dB at 1.00 s
+    1.4710f,             // referenceDurationSeconds — MEASURED 1.1768 s after
+                         // onset (51898 frames / 44100), divided by 0.8: the
+                         // decay pot defaults to 0.8 and reproduces the hit
+                         // exactly there, with headroom above (convention
+                         // shared with sd606_metal_hw.h)
     0.006f,              // minimumDecaySeconds
     0.070f,              // minimumDurationSeconds
     0.650f,              // gateFadeMaxSeconds — long, or the tail clicks off

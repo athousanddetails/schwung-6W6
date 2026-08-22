@@ -88,17 +88,17 @@ PAGES = [
         RATIO("ht"), DECAY("ht", 124), DRIVE("ht"), DTYPE("ht"), LEVEL("ht"),   # decay fitted vs hardware
     ]),
     ("ch", "Closed Hat", [
-        RATIO("ch"), DECAY("ch", 116),                      # decay fitted vs hardware (was 0.70)
+        RATIO("ch"), DECAY("ch", 102),                      # 0.8 == as measured on the hardware
         DRIVE("ch"), DTYPE("ch"), LEVEL("ch"),
         # Lives here as well as on Master: this is where you are standing when
         # you want it. The 606 hardwires CH>OH; here it is a switch.
         E("hh_choke", "Choke", ["Off", "CH > OH", "Mutual"], 1),
     ]),
     ("oh", "Open Hat", [
-        RATIO("oh"), DECAY("oh", 64), DRIVE("oh"), DTYPE("oh"), LEVEL("oh"),    # decay fitted vs hardware
+        RATIO("oh"), DECAY("oh", 102), DRIVE("oh"), DTYPE("oh"), LEVEL("oh"),   # 0.8 == as measured
     ]),
     ("cy", "Cymbal", [
-        RATIO("cy"), DECAY("cy", 120), DRIVE("cy"), DTYPE("cy"), LEVEL("cy"),   # decay fitted vs hardware
+        RATIO("cy"), DECAY("cy", 102), DRIVE("cy"), DTYPE("cy"), LEVEL("cy"),   # 0.8 == as measured
     ]),
     ("cp", "Clap", [
         # ClapVoice::trigger(decay, pitchRatio, noiseAmount); 0.5 is the fit.

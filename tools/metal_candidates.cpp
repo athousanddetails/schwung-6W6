@@ -13,7 +13,6 @@
 #include "score.h"
 #include "HiHats.hpp"
 #include "sd606_cymbal.h"
-#include "sd606_metal.h"
 #include "sd606_metal_hw.h"
 #include "sd606_metal_voice.h"
 using namespace SynthDrums606;
@@ -35,8 +34,8 @@ int main(int argc,char**argv){
     if(argc<4+15){fprintf(stderr,"usage: see header\n");return 1;}
     int rate; auto ref=load_wav(argv[1],&rate); trim_onset(ref); norm(ref);
     const char*voice=argv[3];
-    HiHatSpec cur = !strcmp(voice,"oh") ? sd606_lite(kOpenHatSpec)
-                  : !strcmp(voice,"ch") ? sd606_lite(kClosedHatSpec) : kCymbalSpec;
+    HiHatSpec cur = !strcmp(voice,"oh") ? kHwOpenHatSpec
+                  : !strcmp(voice,"ch") ? kHwClosedHatSpec : kCymbalSpec;
     HiHatSpec hw  = !strcmp(voice,"oh") ? kHwOpenHatSpec
                   : !strcmp(voice,"ch") ? kHwClosedHatSpec : kCymbalSpec;
     const size_t len=std::max(ref.size(),(size_t)(0.5*rate))+(size_t)(0.2*rate);
