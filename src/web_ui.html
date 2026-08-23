@@ -148,8 +148,8 @@
   }
   function apply(k, raw) {
     if (k === "ui_focus") {
-      var pg = String(raw);
-      if (pg in PAGE2LANE && PAGE2LANE[pg] !== lane) selectLane(PAGE2LANE[pg]);
+      var ln = parseInt(raw, 10);                      /* 0-7 lane, 8 = master */
+      if (ln >= 0 && ln < LANES.length && ln !== lane) selectLane(ln);
       return;
     }
     var v = parseInt(raw, 10); if (isNaN(v)) return;
@@ -270,10 +270,10 @@
       schwungRemote.getParam(key(k)).then(function (v) { if (v !== undefined && v !== null && v !== "") apply(k, v); });
     });
   }
-  /* Follow the device: the on-device editor writes synth:ui_focus on every
-   * pad it follows, the manager pushes the change, and we switch instrument.
-   * Handled in apply() so the seed and the live stream take the same path. */
-  var PAGE2LANE = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7 };
+  /* Follow the device: the on-device editor writes synth:ui_focus (lane
+   * index) on every pad it follows; the manager pushes writes and also
+   * re-reads it on its periodic refresh. Handled in apply() so seed, refresh
+   * and live stream take the same path. */
 
   selectLane(0);
   setTimeout(seed, 400); setTimeout(seed, 1500);

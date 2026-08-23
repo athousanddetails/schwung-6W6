@@ -54,7 +54,7 @@ typedef struct {
     uint64_t        mute_until;
     int             mute_one;
 
-    /* Page id the on-device editor is showing ("bd".."cp", "root"). The
+    /* Lane the on-device editor is showing (0-7, "8" = master). The
      * editor WRITES it on every pad-follow; the remote panel reads it back
      * through the manager's change push. It has to be a set_param because the
      * shim only notifies the manager about writes -- a value the DSP merely
@@ -204,6 +204,10 @@ static void on_midi(void *_instance, const uint8_t *_msg, const int _len, const 
     {
         inst->focus_voice = v;
         inst->focus_count++;
+        /* Also the lane the remote panel follows. The editor overwrites this
+         * with its own page when it is open; when it is not, this is what the
+         * manager's periodic re-read of chain_params keys picks up. */
+        snprintf(inst->ui_focus, sizeof(inst->ui_focus), "%d", v);
     }
 }
 
@@ -325,7 +329,7 @@ static int get_param(void *_instance, const char *_key, char *_buf, const int _l
     }
 
     if(!strcmp(_key, "ui_focus"))
-        return snprintf(_buf, (size_t)_len, "%s", inst->ui_focus[0] ? inst->ui_focus : "bd");
+        return snprintf(_buf, (size_t)_len, "%s", inst->ui_focus[0] ? inst->ui_focus : "0");
     if(!strcmp(_key, "clock_running"))
     {
         const int clock = (g_host && g_host->get_clock_status)

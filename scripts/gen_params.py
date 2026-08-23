@@ -182,6 +182,14 @@ levels["root"] = {"name": "6W6",
                   "knobs": [p["key"] for p in GLOBALS[:4]],
                   "params": root}
 
+# Two plugin-level keys that live on NO page but must be in chain_params: the
+# remote-UI manager seeds and periodically re-reads exactly the keys listed
+# here, and a key it does not know about never reaches the browser. ui_focus
+# is the lane the on-device editor is showing (0-7, 8 = master); mutes is the
+# per-lane mute mask. Both are written by ui_chain.js and served by the plugin.
+cp.append({"key": "ui_focus", "name": "Focus", "type": "int", "min": 0, "max": 8, "default": 0})
+cp.append({"key": "mutes", "name": "Mutes", "type": "int", "min": 0, "max": 255, "default": 0})
+
 cpj = json.dumps(cp, separators=(",", ":"))
 uhj = json.dumps({"levels": levels}, separators=(",", ":"))
 

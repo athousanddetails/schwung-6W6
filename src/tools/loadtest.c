@@ -122,9 +122,16 @@ int main(int argc, char **argv)
     api->set_param(inst, "hh_choke", "default");
     api->get_param(inst, "hh_choke", buf, sizeof(buf));
     CHECK(atoi(buf) == 1, "\"default\" works for enums too (hh_choke CH > OH)");
-    api->set_param(inst, "ui_focus", "cy");
+    api->set_param(inst, "ui_focus", "6");
     api->get_param(inst, "ui_focus", buf, sizeof(buf));
-    CHECK(!strcmp(buf, "cy"), "ui_focus round-trips (the editor publishes, the panel follows)");
+    CHECK(!strcmp(buf, "6"), "ui_focus round-trips (the editor publishes, the panel follows)");
+    note_on(69, 90);                                     /* a hand-played snare */
+    api->get_param(inst, "ui_focus", buf, sizeof(buf));
+    CHECK(!strcmp(buf, "1"), "a hand-played pad moves ui_focus on its own (lane 1, no editor needed)");
+    render_peak(400);
+    api->get_param(inst, "chain_params", buf, sizeof(buf));
+    CHECK(strstr(buf, "\"key\":\"ui_focus\"") && strstr(buf, "\"key\":\"mutes\""),
+          "chain_params advertises ui_focus and mutes (so the remote manager seeds them)");
     api->get_param(inst, "chain_params", buf, sizeof(buf));
     CHECK(strstr(buf, "\"key\":\"bd_decay\",\"name\":\"Decay\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":24") != NULL,
           "chain_params advertises the fitted default for bd_decay");

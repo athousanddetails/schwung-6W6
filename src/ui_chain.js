@@ -117,7 +117,8 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
      * only tells schwung-manager about WRITES. */
     function goToLevel(levelKey) {
         if (!controller) return;
-        ctlSetParam("synth:ui_focus", levelKey);
+        var lane = LEVEL2LANE[levelKey];
+        ctlSetParam("synth:ui_focus", String(lane === undefined || lane < 0 ? 8 : lane));
         var pages = controller.pages;
         for (var i = 0; i < pages.length; i++) {
             if (pages[i].level === levelKey ||

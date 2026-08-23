@@ -85,7 +85,7 @@ static const sd606_enum_t g_sd606_enums[SD606_NUM_ENUMS] = {
     { "note_map",  2,  0 },
 };
 
-#define SD606_CHAIN_PARAMS_LEN 4531
+#define SD606_CHAIN_PARAMS_LEN 4680
 static const char sd606_chain_params_json[] =
     "[{\"key\":\"bd_tune\",\"name\":\"Tune\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":40},{\"key\":\"bd_decay\",\"name"
     "\":\"Decay\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":24},{\"key\":\"bd_attack\",\"name\":\"Attack\",\"type\":\"in"
@@ -132,7 +132,8 @@ static const char sd606_chain_params_json[] =
     "me\":\"Master Drive\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":55},{\"key\":\"volume\",\"name\":\"Volume\",\"typ"
     "e\":\"int\",\"min\":0,\"max\":127,\"default\":76,\"viz\":{\"kind\":\"fader\"}},{\"key\":\"accent\",\"name\":\"Accent\",\"typ"
     "e\":\"int\",\"min\":0,\"max\":127,\"default\":42},{\"key\":\"note_map\",\"name\":\"Note Map\",\"type\":\"enum\",\"options\""
-    ":[\"Rack 36\",\"GM\"],\"default\":0}]";
+    ":[\"Rack 36\",\"GM\"],\"default\":0},{\"key\":\"ui_focus\",\"name\":\"Focus\",\"type\":\"int\",\"min\":0,\"max\":8,\"defaul"
+    "t\":0},{\"key\":\"mutes\",\"name\":\"Mutes\",\"type\":\"int\",\"min\":0,\"max\":255,\"default\":0}]";
 
 #define SD606_UI_PAGES_LEN 3102
 static const char sd606_ui_pages_json[] =
