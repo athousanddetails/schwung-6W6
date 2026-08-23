@@ -5,10 +5,12 @@
   bridge; every continuous control is a 0-127 pot, mirroring the hardware.
 
   Laid out after the TR-606 itself: brushed silver panels, black legend, red
-  only where it means something (LEDs, step numbers), a row of small level
-  knobs across the top, an INSTRUMENT selector, and the black sequencer strip
-  with sixteen silver step buttons. The strip is real: the DSP's per-lane
-  16-step sequencer (seq_<voice>, seq_pos) is what it edits and shows.
+  only where it means something, a row of small level knobs across the top
+  and an INSTRUMENT selector. No step strip: the DSP's built-in step lanes
+  are driven by Move's own step buttons through the chain patch, and a second
+  editor for them here double-hits anything also programmed on Move. The
+  panel FOLLOWS the device instead: hit a pad and the instrument changes here
+  too (same ui_focus_level counter the on-device editor watches).
 
   GPL-3.0.
 -->
@@ -76,19 +78,6 @@
            padding: 10px 12px 8px; color: #eee; }
   .strip .hdr { display: flex; justify-content: space-between; align-items: center;
                 font-size: 9px; letter-spacing: 1.5px; margin-bottom: 8px; color: #ddd; }
-  .strip .hdr .last { color: var(--red); font-weight: 700; }
-  .steps { display: grid; grid-template-columns: repeat(16, 1fr); gap: 6px; }
-  .step { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-  .led { width: 10px; height: 10px; border-radius: 50%; background: var(--led-off);
-         border: 1px solid #000; box-shadow: inset 0 0 2px #000; }
-  .led.on { background: var(--red); box-shadow: 0 0 6px var(--red), inset 0 0 2px #fff6; }
-  .led.play { background: #ff6a5a; box-shadow: 0 0 9px #ff6a5a; }
-  .step button { width: 100%; height: 30px; border: 1px solid #000; border-radius: 3px;
-                 background: linear-gradient(180deg, #e6e6e2, var(--btn) 60%, #a9a9a4);
-                 cursor: pointer; box-shadow: 0 2px 0 #000; }
-  .step button:active { transform: translateY(1px); box-shadow: 0 1px 0 #000; }
-  .step .num { font-size: 9px; font-weight: 700; color: var(--red); }
-  .step .num.q { border-top: 1px solid #666; padding-top: 2px; }
   .foot { font-size: 9px; color: #bbb; text-align: right; margin-top: 6px; }
 </style>
 </head>
@@ -115,10 +104,8 @@
     <div class="row" id="master" style="margin-top:10px; padding-top:8px; border-top:1px solid #8a8a86"></div>
   </div>
 
-  <!-- the sequencer strip -->
   <div class="strip">
-    <div class="hdr"><span id="lane-name">BASS DRUM</span><span>STEP &middot; click to toggle &middot; follows Move's transport</span><span class="last">LAST STEP 16</span></div>
-    <div class="steps" id="steps"></div>
+    <div class="hdr"><span id="lane-name">BASS DRUM</span><span>FOLLOWS THE PAD YOU HIT ON MOVE</span><span></span></div>
     <div class="foot">by athousanddetails &middot; voices after 606-Inspired-Synth-Drums (MIT) &middot; drag knobs vertically, double-click to reset</div>
   </div>
 </div>
@@ -152,7 +139,7 @@
     { id: "cp", name: "HAND CLAP", extras: [["cp_noise","Noise"]] }
   ];
 
-  var state = {}, widgets = {}, mutesMask = 0, lane = 0, seqMask = 0, seqPos = -1;
+  var state = {}, widgets = {}, mutesMask = 0, lane = 0, focusStamp = "";
   function key(k) { return "synth:" + k; }
   function addWidget(k, fn) { (widgets[k] = widgets[k] || []).push(fn); }
   function send(k, v) {
@@ -162,8 +149,6 @@
   function apply(k, raw) {
     var v = parseInt(raw, 10); if (isNaN(v)) return;
     if (k === "mutes") { mutesMask = v; renderMute(); return; }
-    if (k === "seq_pos") { seqPos = v; renderSteps(); return; }
-    if (k === "seq_" + LANES[lane].id) { seqMask = v; renderSteps(); return; }
     if (widgets[k]) { state[k] = v; widgets[k].forEach(function (fn) { fn(v); }); }
   }
 
@@ -261,32 +246,11 @@
   sel(master, "hh_choke", "Hat Choke", CHOKE);
   sel(master, "note_map", "Note Map", ["Rack 36", "GM"]);
 
-  /* ---- sequencer strip ---- */
-  var stepsEl = document.getElementById("steps"), leds = [], nums = [];
-  for (var s = 0; s < 16; s++) (function (s) {
-    var st = document.createElement("div"); st.className = "step";
-    var led = document.createElement("div"); led.className = "led";
-    var b = document.createElement("button");
-    b.addEventListener("click", function () {
-      seqMask ^= (1 << s);
-      schwungRemote.setParam(key("seq_" + LANES[lane].id), String(seqMask));
-      renderSteps();
-    });
-    var n = document.createElement("div"); n.className = "num" + (s % 4 === 0 ? " q" : ""); n.textContent = s + 1;
-    st.appendChild(led); st.appendChild(b); st.appendChild(n); stepsEl.appendChild(st);
-    leds.push(led);
-  })(s);
-  function renderSteps() {
-    for (var s = 0; s < 16; s++)
-      leds[s].className = "led" + ((seqMask >> s) & 1 ? " on" : "") + (s === seqPos ? " play" : "");
-  }
-
   function selectLane(i) {
     lane = i;
     instBtns.forEach(function (b, j) { b.className = j === i ? "on" : ""; });
     document.getElementById("lane-name").textContent = LANES[i].name;
     buildVoice(); renderMute();
-    schwungRemote.getParam(key("seq_" + LANES[i].id)).then(function (v) { apply("seq_" + LANES[i].id, v); });
     seed();
   }
 
@@ -301,10 +265,21 @@
       schwungRemote.getParam(key(k)).then(function (v) { if (v !== undefined && v !== null && v !== "") apply(k, v); });
     });
   }
-  /* the playhead: seq_pos is -1 when the transport is stopped */
+  /* Follow the device. The DSP publishes "<count>:<page>" on every hand-
+   * played pad (not while the transport runs, same as the on-device editor);
+   * only a NEW count moves the panel, so clicking an instrument here is never
+   * yanked away by a stale value. */
+  var PAGE2LANE = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7 };
   setInterval(function () {
-    schwungRemote.getParam(key("seq_pos")).then(function (v) { apply("seq_pos", v); });
-  }, 90);
+    schwungRemote.getParam(key("ui_focus_level")).then(function (v) {
+      if (!v || v === focusStamp) return;
+      var first = (focusStamp === "");
+      focusStamp = v;
+      if (first) return;                         /* don't jump on page load */
+      var page = String(v).split(":")[1];
+      if (page in PAGE2LANE && PAGE2LANE[page] !== lane) selectLane(PAGE2LANE[page]);
+    });
+  }, 150);
 
   selectLane(0);
   setTimeout(seed, 400); setTimeout(seed, 1500);
