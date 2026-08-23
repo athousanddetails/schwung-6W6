@@ -71,6 +71,10 @@ note(68, 100); off(68);
 check(injected.length === 2 && injected[0][0] === 0x09 && injected[0][2] === 68, "plain pad press+release pass through to Move");
 check(setLog.length === 1 && setLog[0][0] === "synth:ui_focus" && setLog[0][1] === "0",
       "plain pad publishes only synth:ui_focus=0 (BD lane, for the remote panel to follow)");
+setLog.length = 0; note(68, 100); off(68); note(68, 100); off(68);
+check(setLog.length === 0, "hitting the SAME pad again writes nothing (a param write is a 2.8 ms round-trip)");
+setLog.length = 0; note(69, 100); off(69);
+check(setLog.length === 1 && setLog[0][1] === "1", "moving to another pad does write (lane 1)");
 
 /* pad 16 = master page: never reaches Move */
 injected = []; setLog.length = 0; note(87, 100); off(87);

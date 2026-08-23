@@ -115,10 +115,19 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
     /* Jump the grid to the first page of a hierarchy level, and publish the
      * page id so the remote panel follows. A set_param, not a read: the shim
      * only tells schwung-manager about WRITES. */
+    var lastFocus = -1;
     function goToLevel(levelKey) {
         if (!controller) return;
         var lane = LEVEL2LANE[levelKey];
-        ctlSetParam("synth:ui_focus", String(lane === undefined || lane < 0 ? 8 : lane));
+        if (lane === undefined || lane < 0) lane = 8;      /* 8 = master */
+        /* Only on a CHANGE. Every pad press calls this, and a param write is a
+         * ~2.8 ms round-trip on the shared channel — more than a whole screen
+         * redraw costs — so re-announcing the page you are already on is pure
+         * waste on the path the editor needs for its own reads. */
+        if (lane !== lastFocus) {
+            lastFocus = lane;
+            ctlSetParam("synth:ui_focus", String(lane));
+        }
         var pages = controller.pages;
         for (var i = 0; i < pages.length; i++) {
             if (pages[i].level === levelKey ||

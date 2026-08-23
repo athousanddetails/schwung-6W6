@@ -9,6 +9,10 @@
 # process. New code is picked up when the slot next loads the module.
 #
 #   ./scripts/deploy.sh [host]      (default: move.local)
+#
+# Over USB-C the Move is always 172.16.254.1 (its usb0 gadget) — use that when
+# WiFi is flaky: mDNS goes stale and the LAN address moves, this one does not.
+# There is a `move-usb` alias in ~/.ssh/config for it.
 set -euo pipefail
 
 HOST="${1:-move.local}"
@@ -49,7 +53,10 @@ echo "==> md5 verified: $LOCAL_MD5"
 # help (different process). An on-device loadtest dlopens the file itself, so
 # it passes against code nobody is hearing. Force the slot to reload.
 if [ "${RELOAD:-1}" = "1" ]; then
-    python3 "$SRC/scripts/reload_slot.py" "$HOST" "${SLOT:-0}" 6w6 \
+    # reload_slot talks HTTP to schwung-manager, so it needs an address, not
+    # an ssh alias; take the alias's HostName when one is configured.
+    RHOST=$(ssh -G "$HOST" 2>/dev/null | awk '/^hostname /{print $2; exit}')
+    python3 "$SRC/scripts/reload_slot.py" "${RHOST:-$HOST}" "${SLOT:-0}" 6w6 \
         || echo "    (could not reload automatically - re-pick 6W6 in the slot)"
 fi
 
