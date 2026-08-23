@@ -4,8 +4,13 @@
   slot's synth. Talks to the device through the schwungRemote postMessage
   bridge; every continuous control is a 0-127 pot, mirroring the hardware.
 
-  Panel look after the TR-606's silver-grey face and its orange/red legend.
-  Structure ported from 9W9's panel (GPL-3.0). GPL-3.0.
+  Laid out after the TR-606 itself: brushed silver panels, black legend, red
+  only where it means something (LEDs, step numbers), a row of small level
+  knobs across the top, an INSTRUMENT selector, and the black sequencer strip
+  with sixteen silver step buttons. The strip is real: the DSP's per-lane
+  16-step sequencer (seq_<voice>, seq_pos) is what it edits and shows.
+
+  GPL-3.0.
 -->
 <html>
 <head>
@@ -13,64 +18,108 @@
 <title>6W6</title>
 <style>
   :root {
-    --panel:  #c9c9c4;   /* 606 silver-grey */
-    --dark:   #151515;
-    --accent: #e8541e;   /* 606 orange-red legend */
-    --line:   #8c8c88;
-    --knob:   #262626;
+    --silver:  #d6d6d2;          /* brushed panel          */
+    --silver2: #c4c4bf;          /* lower panel, a shade darker */
+    --ink:     #111;             /* legend                 */
+    --red:     #e0261c;          /* LEDs, step numbers     */
+    --led-off: #5a1310;
+    --strip:   #161616;          /* the sequencer strip    */
+    --btn:     #cfcfca;          /* silver step button cap */
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0f0f0f; font-family: "Helvetica Neue", Arial, sans-serif;
-         padding: 14px; color: var(--dark); }
-  .machine { max-width: 1180px; margin: 0 auto; background: var(--panel);
-             border: 3px solid #000; border-radius: 8px; padding: 12px 14px; }
-  .titlebar { display: flex; align-items: baseline; justify-content: space-between;
-              border-bottom: 4px solid var(--accent); padding-bottom: 6px;
-              margin-bottom: 10px; }
-  .titlebar h1 { font-size: 26px; letter-spacing: 3px; font-weight: 900; }
-  .titlebar h1 span { color: var(--accent); }
-  .titlebar .sub { font-size: 11px; letter-spacing: 2px; color: #444; }
-  .sections { display: flex; flex-wrap: wrap; gap: 10px; }
-  .section { background: #d8d8d3; border: 2px solid #000; border-radius: 5px;
-             padding: 8px 8px 6px; flex: 1 1 200px; min-width: 200px; }
-  .section.master { background: #262626; color: #eee; }
-  .sec-head { display: flex; justify-content: space-between; align-items: center;
-              background: var(--accent); color: #fff; font-weight: 800;
-              font-size: 12px; letter-spacing: 2px; padding: 3px 6px;
-              border: 1px solid #000; margin-bottom: 8px; }
-  .section.master .sec-head { background: #777; }
-  .mute { width: 26px; height: 15px; border: 1px solid #000; background: #ddd;
-          color: #000; cursor: pointer; font-size: 9px; font-weight: 700;
-          line-height: 13px; text-align: center; user-select: none; }
-  .mute.on { background: #d22; color: #fff; }
-  .knobs { display: flex; flex-wrap: wrap; gap: 6px 4px; }
-  .cell { width: 60px; text-align: center; }
-  .dial { width: 44px; height: 44px; margin: 0 auto; border-radius: 50%;
-          background: radial-gradient(circle at 35% 30%, #4a4a4a, var(--knob) 70%);
-          border: 2px solid #000; position: relative; cursor: ns-resize;
-          touch-action: none; }
-  .dial .ptr { position: absolute; left: 50%; top: 50%; width: 3px; height: 17px;
-               background: #f2f2f2; transform-origin: 50% 0%; border-radius: 2px; }
-  .cell label { display: block; font-size: 9.5px; font-weight: 700;
-                letter-spacing: .5px; margin-top: 3px; text-transform: uppercase; }
-  .cell .val { font-size: 10px; color: #555; }
-  .section.master .cell .val { color: #bbb; }
-  select { width: 58px; height: 44px; border: 2px solid #000; border-radius: 5px;
-           background: #ddd; font-weight: 700; font-size: 10px; text-align: center; }
-  .footer { margin-top: 10px; font-size: 10px; color: #555;
-            display: flex; justify-content: space-between; }
+  body { background: #222; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+         padding: 14px; color: var(--ink); }
+  .machine { max-width: 1180px; margin: 0 auto; background: #3a3a3a;
+             border: 2px solid #000; border-radius: 10px; padding: 8px; }
+  .panel { background: linear-gradient(180deg, #e0e0dc 0%, var(--silver) 40%, #cfcfca 100%);
+           border: 1px solid #8a8a86; border-radius: 4px; padding: 8px 12px; margin-bottom: 6px; }
+  .panel.lower { background: linear-gradient(180deg, #d2d2ce, var(--silver2)); }
+  .row { display: flex; align-items: flex-end; gap: 10px; }
+  .brand { display: flex; align-items: baseline; justify-content: space-between; }
+  .brand .logo { font-size: 30px; font-weight: 900; letter-spacing: 1px; }
+  .brand .model { font-size: 26px; font-weight: 300; letter-spacing: 1px; }
+  .brand .model b { font-weight: 900; }
+  .legend { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+            text-align: center; white-space: nowrap; }
+  .legend.sm { font-weight: 400; letter-spacing: .8px; font-size: 8.5px; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; }
+  .cell.wide { width: 90px; }
+  .val { font-size: 9px; color: #333; height: 10px; }
+  .knob { position: relative; width: 40px; height: 40px; border-radius: 50%;
+          background: radial-gradient(circle at 50% 45%, #f2f2f0 0 34%, #b9b9b6 35% 48%, #1a1a1a 49% 100%);
+          border: 1px solid #000; cursor: ns-resize; touch-action: none; }
+  .knob.big { width: 58px; height: 58px; }
+  .knob .ptr { position: absolute; left: 50%; top: 50%; width: 2px; height: 15px;
+               background: #000; transform-origin: 50% 0%; }
+  .knob.big .ptr { height: 22px; }
+  .ticks { position: absolute; inset: -6px; border-radius: 50%;
+           background: repeating-conic-gradient(from -135deg, #333 0 1deg, transparent 1deg 27deg);
+           -webkit-mask: radial-gradient(circle, transparent 57%, #000 58%); mask: radial-gradient(circle, transparent 57%, #000 58%);
+           pointer-events: none; }
+  select { width: 66px; height: 22px; border: 1px solid #000; border-radius: 3px;
+           background: #ebebe8; font-weight: 700; font-size: 10px; }
+  .sep { width: 1px; align-self: stretch; background: #8a8a86; margin: 0 4px; }
+  .grow { flex: 1; }
+  /* instrument selector: the 606's TRACK/INSTRUMENT ring, flattened */
+  .inst { display: flex; gap: 4px; }
+  .inst button { font: 700 10px/1 Helvetica, Arial; letter-spacing: 1px; padding: 6px 9px;
+                 border: 1px solid #000; border-radius: 3px; background: #ebebe8; cursor: pointer; }
+  .inst button.on { background: #111; color: #fff; }
+  .inst button .n { display: inline-block; background: #111; color: #fff; padding: 1px 3px;
+                    margin-right: 4px; border-radius: 2px; font-size: 9px; }
+  .inst button.on .n { background: #fff; color: #111; }
+  .mute { font: 700 10px/1 Helvetica, Arial; padding: 6px 9px; border: 1px solid #000;
+          border-radius: 3px; background: #ebebe8; cursor: pointer; letter-spacing: 1px; }
+  .mute.on { background: var(--red); color: #fff; }
+  /* the sequencer strip */
+  .strip { background: var(--strip); border: 2px solid #000; border-radius: 4px;
+           padding: 10px 12px 8px; color: #eee; }
+  .strip .hdr { display: flex; justify-content: space-between; align-items: center;
+                font-size: 9px; letter-spacing: 1.5px; margin-bottom: 8px; color: #ddd; }
+  .strip .hdr .last { color: var(--red); font-weight: 700; }
+  .steps { display: grid; grid-template-columns: repeat(16, 1fr); gap: 6px; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .led { width: 10px; height: 10px; border-radius: 50%; background: var(--led-off);
+         border: 1px solid #000; box-shadow: inset 0 0 2px #000; }
+  .led.on { background: var(--red); box-shadow: 0 0 6px var(--red), inset 0 0 2px #fff6; }
+  .led.play { background: #ff6a5a; box-shadow: 0 0 9px #ff6a5a; }
+  .step button { width: 100%; height: 30px; border: 1px solid #000; border-radius: 3px;
+                 background: linear-gradient(180deg, #e6e6e2, var(--btn) 60%, #a9a9a4);
+                 cursor: pointer; box-shadow: 0 2px 0 #000; }
+  .step button:active { transform: translateY(1px); box-shadow: 0 1px 0 #000; }
+  .step .num { font-size: 9px; font-weight: 700; color: var(--red); }
+  .step .num.q { border-top: 1px solid #666; padding-top: 2px; }
+  .foot { font-size: 9px; color: #bbb; text-align: right; margin-top: 6px; }
 </style>
 </head>
 <body>
 <div class="machine">
-  <div class="titlebar">
-    <h1>6W6 <span>DRUMATIX</span></h1>
-    <div class="sub">ALL SYNTHESIZED &middot; SCHWUNG</div>
+
+  <!-- top panel: brand + level knobs, like the 606's top strip -->
+  <div class="panel">
+    <div class="brand"><div class="logo">6W6</div><div class="model">Drumatix</div></div>
+    <div class="row" id="levels" style="margin-top:6px"></div>
   </div>
-  <div class="sections" id="sections"></div>
-  <div class="footer">
-    <div>drag knobs vertically &middot; double-click to reset</div>
-    <div>by athousanddetails &middot; voices after 606-Inspired-Synth-Drums (MIT)</div>
+
+  <!-- middle panel: instrument selector, the selected voice's controls, master -->
+  <div class="panel lower">
+    <div class="row" style="align-items:center; margin-bottom:8px">
+      <div class="legend">Instrument</div>
+      <div class="inst" id="inst"></div>
+      <div class="grow"></div>
+      <button class="mute" id="mute">MUTE</button>
+      <div class="sep"></div>
+      <div class="model" style="font-size:18px"><b>TR</b>-606 <span style="font-size:11px; font-weight:400">Computer Controlled</span></div>
+    </div>
+    <div class="row" id="voice"></div>
+    <div class="row" id="master" style="margin-top:10px; padding-top:8px; border-top:1px solid #8a8a86"></div>
+  </div>
+
+  <!-- the sequencer strip -->
+  <div class="strip">
+    <div class="hdr"><span id="lane-name">BASS DRUM</span><span>STEP &middot; click to toggle &middot; follows Move's transport</span><span class="last">LAST STEP 16</span></div>
+    <div class="steps" id="steps"></div>
+    <div class="foot">by athousanddetails &middot; voices after 606-Inspired-Synth-Drums (MIT) &middot; drag knobs vertically, double-click to reset</div>
   </div>
 </div>
 
@@ -79,177 +128,186 @@
 (function () {
   "use strict";
 
+  /* Degrade instead of dying if the bridge script is missing (headless
+   * screenshot, or schwung-manager not serving /static): every control still
+   * draws, nothing is sent anywhere. */
+  if (!window.schwungRemote) {
+    var noop = function () { return { then: function () {} }; };
+    window.schwungRemote = { getParam: noop, setParam: function () {}, onParamChange: function () {} };
+  }
+
   var DIST  = ["Diode", "Clip", "Fold", "Crush"];
   var MDIST = ["Off", "Diode", "Clip", "Fold", "Crush"];
   var CHOKE = ["Off", "CH > OH", "Mutual"];
 
-  function pot(k, n)      { return { k: k, n: n }; }
-  function en(k, n, opts) { return { k: k, n: n, opts: opts }; }
-
-  /* Every voice: Tune, Decay, [voice extras], Drive, Dist, Level — the same
-   * shape as the on-device pages (gen_params.py is the source of both). */
-  function voice(id, extras) {
-    return [ pot(id+"_tune","Tune"), pot(id+"_decay","Decay") ]
-      .concat(extras || [])
-      .concat([ pot(id+"_drive","Drive"), en(id+"_dist_type","Dist",DIST),
-                pot(id+"_level","Level") ]);
-  }
-
-  /* lane = bit in synth:mutes; -1 = no mute button */
-  var SECTIONS = [
-    { name: "BASS DRUM",  lane: 0, knobs: voice("bd", [pot("bd_attack","Attack"), pot("bd_drift","Drift")]) },
-    { name: "SNARE DRUM", lane: 1, knobs: voice("sd", [pot("sd_snappy","Snappy"), pot("sd_tone","Tone")]) },
-    { name: "LOW TOM",    lane: 2, knobs: voice("lt") },
-    { name: "HI TOM",     lane: 3, knobs: voice("ht") },
-    { name: "CLOSED HAT", lane: 4, knobs: voice("ch").concat([en("hh_choke","Choke",CHOKE)]) },
-    { name: "OPEN HAT",   lane: 5, knobs: voice("oh") },
-    { name: "CYMBAL",     lane: 6, knobs: voice("cy") },
-    { name: "HAND CLAP",  lane: 7, knobs: voice("cp", [pot("cp_noise","Noise")]) },
-    { name: "MASTER", lane: -1, master: true, knobs: [
-        en("master_dist","Dist",MDIST), pot("master_drive","Drive"),
-        pot("volume","Volume"), pot("accent","Accent"),
-        en("hh_choke","Choke",CHOKE),
-        en("note_map","Notes",["Rack","GM"]) ] }
+  /* lanes, in the DSP's order; n = the 606's instrument number style */
+  var LANES = [
+    { id: "bd", name: "BASS DRUM", extras: [["bd_attack","Attack"],["bd_drift","Drift"]] },
+    { id: "sd", name: "SNARE DRUM", extras: [["sd_snappy","Snappy"],["sd_tone","Tone"]] },
+    { id: "lt", name: "LOW TOM",   extras: [] },
+    { id: "ht", name: "HI TOM",    extras: [] },
+    { id: "ch", name: "CLOSED HAT",extras: [["hh_choke","Choke",CHOKE]] },
+    { id: "oh", name: "OPEN HAT",  extras: [] },
+    { id: "cy", name: "CYMBAL",    extras: [] },
+    { id: "cp", name: "HAND CLAP", extras: [["cp_noise","Noise"]] }
   ];
 
-  var state = {};        /* key -> value */
-  var widgets = {};      /* key -> [update fn] (hh_choke appears twice) */
-  var mutesMask = 0;
-  var muteBtns = {};
-
+  var state = {}, widgets = {}, mutesMask = 0, lane = 0, seqMask = 0, seqPos = -1;
   function key(k) { return "synth:" + k; }
-
+  function addWidget(k, fn) { (widgets[k] = widgets[k] || []).push(fn); }
   function send(k, v) {
-    state[k] = v;
-    schwungRemote.setParam(key(k), String(v));
-    /* mirror the same key's other widget (Choke is on two sections) */
+    state[k] = v; schwungRemote.setParam(key(k), String(v));
     (widgets[k] || []).forEach(function (fn) { fn(v); });
   }
-
-  function addWidget(k, fn) { (widgets[k] = widgets[k] || []).push(fn); }
-
-  function makeDial(cell, kn) {
-    var dial = document.createElement("div"); dial.className = "dial";
-    var ptr = document.createElement("div"); ptr.className = "ptr";
-    dial.appendChild(ptr);
-    var val = document.createElement("div"); val.className = "val";
-    val.textContent = "0";
-
-    function render(v) {
-      var ang = -135 + (v / 127) * 270;
-      ptr.style.transform = "translate(-50%,0) rotate(" + (ang + 180) + "deg)";
-      val.textContent = v;
-    }
-    addWidget(kn.k, render);
-
-    var dragY = null, dragV = 0;
-    function move(e) {
-      if (dragY === null) return;
-      var y = (e.touches ? e.touches[0].clientY : e.clientY);
-      var v = Math.max(0, Math.min(127, Math.round(dragV + (dragY - y) * 0.7)));
-      if (v !== state[kn.k]) { render(v); send(kn.k, v); }
-      e.preventDefault();
-    }
-    function up() { dragY = null;
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-      window.removeEventListener("touchmove", move);
-      window.removeEventListener("touchend", up); }
-    function down(e) {
-      dragY = (e.touches ? e.touches[0].clientY : e.clientY);
-      dragV = state[kn.k] | 0;
-      window.addEventListener("mousemove", move);
-      window.addEventListener("mouseup", up);
-      window.addEventListener("touchmove", move, { passive: false });
-      window.addEventListener("touchend", up);
-      e.preventDefault();
-    }
-    dial.addEventListener("mousedown", down);
-    dial.addEventListener("touchstart", down, { passive: false });
-    /* double-click resets to the DSP's own default, not a blind 64: the
-     * kit's defaults are fitted against a real 606 and most are not centred */
-    dial.addEventListener("dblclick", function () {
-      schwungRemote.setParam(key(kn.k), "default");
-      setTimeout(function () {
-        schwungRemote.getParam(key(kn.k)).then(function (v) { apply(kn.k, v); });
-      }, 120);
-    });
-
-    cell.appendChild(dial); cell.appendChild(val);
-    render(0);
-  }
-
-  function makeEnum(cell, kn) {
-    var sel = document.createElement("select");
-    kn.opts.forEach(function (o, i) {
-      var op = document.createElement("option");
-      op.value = i; op.textContent = o; sel.appendChild(op);
-    });
-    sel.addEventListener("change", function () { send(kn.k, sel.value | 0); });
-    addWidget(kn.k, function (v) { sel.value = Math.min(v, kn.opts.length - 1); });
-    cell.appendChild(sel);
-  }
-
-  var root = document.getElementById("sections");
-  SECTIONS.forEach(function (sec) {
-    var box = document.createElement("div");
-    box.className = "section" + (sec.master ? " master" : "");
-    var head = document.createElement("div"); head.className = "sec-head";
-    var title = document.createElement("span"); title.textContent = sec.name;
-    head.appendChild(title);
-    if (sec.lane >= 0) {
-      var mb = document.createElement("div");
-      mb.className = "mute"; mb.textContent = "MUTE";
-      mb.addEventListener("click", function () {
-        mutesMask = (mutesMask ^ (1 << sec.lane)) & 0xFF;
-        schwungRemote.setParam(key("mutes"), String(mutesMask));
-        renderMutes();
-      });
-      muteBtns[sec.lane] = mb;
-      head.appendChild(mb);
-    }
-    box.appendChild(head);
-    var grid = document.createElement("div"); grid.className = "knobs";
-    sec.knobs.forEach(function (kn) {
-      var cell = document.createElement("div"); cell.className = "cell";
-      if (kn.opts) makeEnum(cell, kn); else makeDial(cell, kn);
-      var lab = document.createElement("label"); lab.textContent = kn.n;
-      cell.appendChild(lab);
-      grid.appendChild(cell);
-    });
-    box.appendChild(grid);
-    root.appendChild(box);
-  });
-
-  function renderMutes() {
-    Object.keys(muteBtns).forEach(function (lane) {
-      muteBtns[lane].className = "mute" + ((mutesMask >> lane) & 1 ? " on" : "");
-    });
-  }
-
   function apply(k, raw) {
-    var v = parseInt(raw, 10);
-    if (isNaN(v)) return;
-    if (k === "mutes") { mutesMask = v; renderMutes(); return; }
+    var v = parseInt(raw, 10); if (isNaN(v)) return;
+    if (k === "mutes") { mutesMask = v; renderMute(); return; }
+    if (k === "seq_pos") { seqPos = v; renderSteps(); return; }
+    if (k === "seq_" + LANES[lane].id) { seqMask = v; renderSteps(); return; }
     if (widgets[k]) { state[k] = v; widgets[k].forEach(function (fn) { fn(v); }); }
   }
 
+  /* ---- widgets ---- */
+  function knob(parent, k, label, big) {
+    var cell = document.createElement("div"); cell.className = "cell" + (big ? " wide" : "");
+    var lg = document.createElement("div"); lg.className = "legend"; lg.textContent = label;
+    var kn = document.createElement("div"); kn.className = "knob" + (big ? " big" : "");
+    var tk = document.createElement("div"); tk.className = "ticks";
+    var ptr = document.createElement("div"); ptr.className = "ptr";
+    kn.appendChild(tk); kn.appendChild(ptr);
+    var val = document.createElement("div"); val.className = "val";
+    function render(v) {
+      ptr.style.transform = "translate(-50%,0) rotate(" + (-135 + v / 127 * 270 + 180) + "deg)";
+      val.textContent = v;
+    }
+    addWidget(k, render);
+    var y0 = null, v0 = 0;
+    function move(e) {
+      if (y0 === null) return;
+      var y = e.touches ? e.touches[0].clientY : e.clientY;
+      var v = Math.max(0, Math.min(127, Math.round(v0 + (y0 - y) * 0.7)));
+      if (v !== state[k]) send(k, v);
+      e.preventDefault();
+    }
+    function up() { y0 = null; window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up);
+                    window.removeEventListener("touchmove", move); window.removeEventListener("touchend", up); }
+    function down(e) {
+      y0 = e.touches ? e.touches[0].clientY : e.clientY; v0 = state[k] | 0;
+      window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+      window.addEventListener("touchmove", move, { passive: false }); window.addEventListener("touchend", up);
+      e.preventDefault();
+    }
+    kn.addEventListener("mousedown", down); kn.addEventListener("touchstart", down, { passive: false });
+    /* reset = the DSP's fitted default, not a guessed 64 */
+    kn.addEventListener("dblclick", function () {
+      schwungRemote.setParam(key(k), "default");
+      setTimeout(function () { schwungRemote.getParam(key(k)).then(function (v) { apply(k, v); }); }, 120);
+    });
+    cell.appendChild(lg); cell.appendChild(kn); cell.appendChild(val);
+    parent.appendChild(cell); render(state[k] | 0);
+  }
+  function sel(parent, k, label, opts) {
+    var cell = document.createElement("div"); cell.className = "cell";
+    var lg = document.createElement("div"); lg.className = "legend"; lg.textContent = label;
+    var s = document.createElement("select");
+    opts.forEach(function (o, i) { var op = document.createElement("option"); op.value = i; op.textContent = o; s.appendChild(op); });
+    s.addEventListener("change", function () { send(k, s.value | 0); });
+    addWidget(k, function (v) { s.value = Math.min(v, opts.length - 1); });
+    cell.appendChild(lg); cell.appendChild(s); parent.appendChild(cell);
+    s.value = state[k] | 0;
+  }
+
+  /* ---- top strip: accent + one level knob per voice + volume ---- */
+  var top = document.getElementById("levels");
+  knob(top, "accent", "Accent");
+  var sepA = document.createElement("div"); sepA.className = "sep"; top.appendChild(sepA);
+  LANES.forEach(function (L) { knob(top, L.id + "_level", L.name.replace(" DRUM", "").replace("HAND ", "")); });
+  var grow = document.createElement("div"); grow.className = "grow"; top.appendChild(grow);
+  knob(top, "volume", "Volume", true);
+
+  /* ---- instrument selector ---- */
+  var inst = document.getElementById("inst"), instBtns = [];
+  LANES.forEach(function (L, i) {
+    var b = document.createElement("button");
+    b.innerHTML = '<span class="n">' + (i + 1) + '</span>' + L.id.toUpperCase();
+    b.addEventListener("click", function () { selectLane(i); });
+    inst.appendChild(b); instBtns.push(b);
+  });
+  var muteBtn = document.getElementById("mute");
+  muteBtn.addEventListener("click", function () {
+    mutesMask = (mutesMask ^ (1 << lane)) & 0xFF;
+    schwungRemote.setParam(key("mutes"), String(mutesMask)); renderMute();
+  });
+  function renderMute() { muteBtn.className = "mute" + ((mutesMask >> lane) & 1 ? " on" : ""); }
+
+  /* ---- selected voice's controls ---- */
+  var voiceRow = document.getElementById("voice");
+  function buildVoice() {
+    voiceRow.innerHTML = "";
+    var L = LANES[lane], id = L.id;
+    knob(voiceRow, id + "_tune", "Tune");
+    knob(voiceRow, id + "_decay", "Decay");
+    L.extras.forEach(function (x) { if (x[2]) sel(voiceRow, x[0], x[1], x[2]); else knob(voiceRow, x[0], x[1]); });
+    var sp = document.createElement("div"); sp.className = "sep"; voiceRow.appendChild(sp);
+    knob(voiceRow, id + "_drive", "Drive");
+    sel(voiceRow, id + "_dist_type", "Distortion", DIST);
+  }
+
+  /* ---- master ---- */
+  var master = document.getElementById("master");
+  sel(master, "master_dist", "Master Dist", MDIST);
+  knob(master, "master_drive", "Master Drive");
+  var sp2 = document.createElement("div"); sp2.className = "sep"; master.appendChild(sp2);
+  sel(master, "hh_choke", "Hat Choke", CHOKE);
+  sel(master, "note_map", "Note Map", ["Rack 36+", "GM"]);
+
+  /* ---- sequencer strip ---- */
+  var stepsEl = document.getElementById("steps"), leds = [], nums = [];
+  for (var s = 0; s < 16; s++) (function (s) {
+    var st = document.createElement("div"); st.className = "step";
+    var led = document.createElement("div"); led.className = "led";
+    var b = document.createElement("button");
+    b.addEventListener("click", function () {
+      seqMask ^= (1 << s);
+      schwungRemote.setParam(key("seq_" + LANES[lane].id), String(seqMask));
+      renderSteps();
+    });
+    var n = document.createElement("div"); n.className = "num" + (s % 4 === 0 ? " q" : ""); n.textContent = s + 1;
+    st.appendChild(led); st.appendChild(b); st.appendChild(n); stepsEl.appendChild(st);
+    leds.push(led);
+  })(s);
+  function renderSteps() {
+    for (var s = 0; s < 16; s++)
+      leds[s].className = "led" + ((seqMask >> s) & 1 ? " on" : "") + (s === seqPos ? " play" : "");
+  }
+
+  function selectLane(i) {
+    lane = i;
+    instBtns.forEach(function (b, j) { b.className = j === i ? "on" : ""; });
+    document.getElementById("lane-name").textContent = LANES[i].name;
+    buildVoice(); renderMute();
+    schwungRemote.getParam(key("seq_" + LANES[i].id)).then(function (v) { apply("seq_" + LANES[i].id, v); });
+    seed();
+  }
+
+  /* ---- bridge ---- */
   schwungRemote.onParamChange(function (params) {
     Object.keys(params).forEach(function (full) {
       if (full.indexOf("synth:") === 0) apply(full.substring(6), params[full]);
     });
   });
-
-  /* Seed everything once the bridge has state. */
   function seed() {
     Object.keys(widgets).concat(["mutes"]).forEach(function (k) {
-      schwungRemote.getParam(key(k)).then(function (v) {
-        if (v !== undefined && v !== null && v !== "") apply(k, v);
-      });
+      schwungRemote.getParam(key(k)).then(function (v) { if (v !== undefined && v !== null && v !== "") apply(k, v); });
     });
   }
-  setTimeout(seed, 400);
-  setTimeout(seed, 1500);
+  /* the playhead: seq_pos is -1 when the transport is stopped */
+  setInterval(function () {
+    schwungRemote.getParam(key("seq_pos")).then(function (v) { apply("seq_pos", v); });
+  }, 90);
+
+  selectLane(0);
+  setTimeout(seed, 400); setTimeout(seed, 1500);
 })();
 </script>
 </body>
