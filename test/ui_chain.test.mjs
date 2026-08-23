@@ -69,11 +69,13 @@ const off  = n => ui.onMidiMessageInternal(new Uint8Array([0x80, n, 0]));
 injected = []; setLog.length = 0;
 note(68, 100); off(68);
 check(injected.length === 2 && injected[0][0] === 0x09 && injected[0][2] === 68, "plain pad press+release pass through to Move");
-check(setLog.length === 0, "plain pad writes no params");
+check(setLog.length === 1 && setLog[0][0] === "synth:ui_focus" && setLog[0][1] === "bd",
+      "plain pad publishes only synth:ui_focus=bd (for the remote panel to follow)");
 
 /* pad 16 = master page: never reaches Move */
-injected = []; note(87, 100); off(87);
+injected = []; setLog.length = 0; note(87, 100); off(87);
 check(injected.length === 0, "pad 16 (master) never sounds");
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "root"), "pad 16 publishes ui_focus=root");
 
 /* Shift+Pad: silent select -> mute_ms 60 then inject */
 shift = true; injected = []; setLog.length = 0;

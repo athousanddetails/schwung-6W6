@@ -53,6 +53,13 @@ typedef struct {
     uint64_t        samples_rendered;
     uint64_t        mute_until;
     int             mute_one;
+
+    /* Page id the on-device editor is showing ("bd".."cp", "root"). The
+     * editor WRITES it on every pad-follow; the remote panel reads it back
+     * through the manager's change push. It has to be a set_param because the
+     * shim only notifies the manager about writes -- a value the DSP merely
+     * computes (ui_focus_level) never reaches the browser. */
+    char            ui_focus[8];
 } sd606_instance_t;
 
 /* ---- MIDI note map -------------------------------------------------- */
@@ -212,6 +219,11 @@ static void set_param(void *_instance, const char *_key, const char *_val)
         sd606_set_param(inst->engine, _key, _val);
         return;
     }
+    if(!strcmp(_key, "ui_focus"))
+    {
+        snprintf(inst->ui_focus, sizeof(inst->ui_focus), "%s", _val);
+        return;
+    }
     if(!strcmp(_key, "mute_ms"))
     {
         const int ms = atoi(_val);
@@ -312,6 +324,8 @@ static int get_param(void *_instance, const char *_key, char *_buf, const int _l
         return snprintf(_buf, (size_t)_len, "%u:%s", inst->focus_count, kLevelOf[v]);
     }
 
+    if(!strcmp(_key, "ui_focus"))
+        return snprintf(_buf, (size_t)_len, "%s", inst->ui_focus[0] ? inst->ui_focus : "bd");
     if(!strcmp(_key, "clock_running"))
     {
         const int clock = (g_host && g_host->get_clock_status)

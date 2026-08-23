@@ -112,9 +112,12 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
         ctlSetParam("synth:mutes", String(mutesMask));
     }
 
-    /* Jump the grid to the first page of a hierarchy level. */
+    /* Jump the grid to the first page of a hierarchy level, and publish the
+     * page id so the remote panel follows. A set_param, not a read: the shim
+     * only tells schwung-manager about WRITES. */
     function goToLevel(levelKey) {
         if (!controller) return;
+        ctlSetParam("synth:ui_focus", levelKey);
         var pages = controller.pages;
         for (var i = 0; i < pages.length; i++) {
             if (pages[i].level === levelKey ||

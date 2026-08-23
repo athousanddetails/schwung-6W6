@@ -10,7 +10,7 @@
   are driven by Move's own step buttons through the chain patch, and a second
   editor for them here double-hits anything also programmed on Move. The
   panel FOLLOWS the device instead: hit a pad and the instrument changes here
-  too (same ui_focus_level counter the on-device editor watches).
+  too (the editor publishes the page it follows as synth:ui_focus).
 
   GPL-3.0.
 -->
@@ -139,7 +139,7 @@
     { id: "cp", name: "HAND CLAP", extras: [["cp_noise","Noise"]] }
   ];
 
-  var state = {}, widgets = {}, mutesMask = 0, lane = 0, focusStamp = "";
+  var state = {}, widgets = {}, mutesMask = 0, lane = 0;
   function key(k) { return "synth:" + k; }
   function addWidget(k, fn) { (widgets[k] = widgets[k] || []).push(fn); }
   function send(k, v) {
@@ -147,6 +147,11 @@
     (widgets[k] || []).forEach(function (fn) { fn(v); });
   }
   function apply(k, raw) {
+    if (k === "ui_focus") {
+      var pg = String(raw);
+      if (pg in PAGE2LANE && PAGE2LANE[pg] !== lane) selectLane(PAGE2LANE[pg]);
+      return;
+    }
     var v = parseInt(raw, 10); if (isNaN(v)) return;
     if (k === "mutes") { mutesMask = v; renderMute(); return; }
     if (widgets[k]) { state[k] = v; widgets[k].forEach(function (fn) { fn(v); }); }
@@ -261,25 +266,14 @@
     });
   });
   function seed() {
-    Object.keys(widgets).concat(["mutes"]).forEach(function (k) {
+    Object.keys(widgets).concat(["mutes", "ui_focus"]).forEach(function (k) {
       schwungRemote.getParam(key(k)).then(function (v) { if (v !== undefined && v !== null && v !== "") apply(k, v); });
     });
   }
-  /* Follow the device. The DSP publishes "<count>:<page>" on every hand-
-   * played pad (not while the transport runs, same as the on-device editor);
-   * only a NEW count moves the panel, so clicking an instrument here is never
-   * yanked away by a stale value. */
+  /* Follow the device: the on-device editor writes synth:ui_focus on every
+   * pad it follows, the manager pushes the change, and we switch instrument.
+   * Handled in apply() so the seed and the live stream take the same path. */
   var PAGE2LANE = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7 };
-  setInterval(function () {
-    schwungRemote.getParam(key("ui_focus_level")).then(function (v) {
-      if (!v || v === focusStamp) return;
-      var first = (focusStamp === "");
-      focusStamp = v;
-      if (first) return;                         /* don't jump on page load */
-      var page = String(v).split(":")[1];
-      if (page in PAGE2LANE && PAGE2LANE[page] !== lane) selectLane(PAGE2LANE[page]);
-    });
-  }, 150);
 
   selectLane(0);
   setTimeout(seed, 400); setTimeout(seed, 1500);

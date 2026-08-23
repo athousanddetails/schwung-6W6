@@ -45,9 +45,9 @@ Mutual.
 ## Remote panel
 
 A TR-606-style panel in the browser — level knobs across the top, an
-INSTRUMENT selector, the selected drum's controls, and a live sixteen-step
-strip that edits the slot's built-in step lanes and follows the playhead.
-Open `move.local:7700/remote-ui` while 6W6 is the slot's synth.
+INSTRUMENT selector and the selected drum's controls. It follows the device:
+hit a pad on Move and the panel switches to that drum. Open
+`move.local:7700/remote-ui` while 6W6 is the slot's synth.
 
 ![6W6 remote panel](docs/img/remote-ui.png)
 

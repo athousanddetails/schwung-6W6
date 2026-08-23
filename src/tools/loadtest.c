@@ -122,6 +122,9 @@ int main(int argc, char **argv)
     api->set_param(inst, "hh_choke", "default");
     api->get_param(inst, "hh_choke", buf, sizeof(buf));
     CHECK(atoi(buf) == 1, "\"default\" works for enums too (hh_choke CH > OH)");
+    api->set_param(inst, "ui_focus", "cy");
+    api->get_param(inst, "ui_focus", buf, sizeof(buf));
+    CHECK(!strcmp(buf, "cy"), "ui_focus round-trips (the editor publishes, the panel follows)");
     api->get_param(inst, "chain_params", buf, sizeof(buf));
     CHECK(strstr(buf, "\"key\":\"bd_decay\",\"name\":\"Decay\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":24") != NULL,
           "chain_params advertises the fitted default for bd_decay");
