@@ -74,11 +74,20 @@
       "title": "Remote UI",
       "lines": [
         "Full panel in the",
-        "browser:",
-        "move.local:7700",
-        " /remote-ui",
-        "Drag knobs, mute",
-        "buttons per drum."
+        "browser, on port",
+        "7700 of whatever",
+        "address the Move is",
+        "on:",
+        " move.local:7700",
+        " (WiFi, if mDNS",
+        "  is behaving)",
+        " 172.16.254.1:7700",
+        " (USB-C, always",
+        "  this address)",
+        "then /remote-ui.",
+        "",
+        "The panel follows",
+        "the pad you hit."
       ]
     }
   ]

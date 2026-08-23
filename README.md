@@ -46,8 +46,11 @@ Mutual.
 
 A TR-606-style panel in the browser — level knobs across the top, an
 INSTRUMENT selector and the selected drum's controls. It follows the device:
-hit a pad on Move and the panel switches to that drum. Open
-`move.local:7700/remote-ui` while 6W6 is the slot's synth.
+hit a pad on Move and the panel switches to that drum.
+
+Open port 7700 on whatever address the Move is on, then `/remote-ui`, while
+6W6 is the slot's synth — `move.local:7700` over WiFi, or `172.16.254.1:7700`
+over USB-C, which is always that address and works when WiFi does not.
 
 ![6W6 remote panel](docs/img/remote-ui.png)
 
