@@ -42,4 +42,15 @@ LOCAL_MD5=$(md5 -q "$BUILD" 2>/dev/null || md5sum "$BUILD" | cut -d' ' -f1)
 REMOTE_MD5=$(ssh "$HOST" "md5sum $DEST/dsp.so | cut -d' ' -f1")
 [ "$LOCAL_MD5" = "$REMOTE_MD5" ] || { echo "FATAL: md5 mismatch — $LOCAL_MD5 != $REMOTE_MD5" >&2; exit 1; }
 echo "==> md5 verified: $LOCAL_MD5"
-echo "==> done. Reload the slot (or kill shadow_ui) to pick up new code."
+
+# A NEW dsp.so ON DISK IS NOT THE RUNNING ONE. The chain host dlopen()s the
+# plugin into the shim; the atomic mv above swaps the directory entry while the
+# running process keeps the old inode mapped, and `kill shadow_ui` does not
+# help (different process). An on-device loadtest dlopens the file itself, so
+# it passes against code nobody is hearing. Force the slot to reload.
+if [ "${RELOAD:-1}" = "1" ]; then
+    python3 "$SRC/scripts/reload_slot.py" "$HOST" "${SLOT:-0}" 6w6 \
+        || echo "    (could not reload automatically - re-pick 6W6 in the slot)"
+fi
+
+echo "==> done."
