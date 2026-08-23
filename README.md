@@ -18,7 +18,7 @@ a spare pad is a spare pad.
 | Low / Hi Tom | Main mode with quieter resonances around it; the low tom falls into pitch, the high tom leaves a lower ring |
 | Closed / Open Hat | One metal bank of 32 measured partials — fitted from a hardware 606's hats — under two envelopes, like the circuit |
 | Cymbal | The same metal source with its own 32-line table measured off a hardware cymbal, down to 266 Hz where a hat's table stops at 3.7 kHz |
-| Hand Clap | Four timed noise bursts and a diffuse tail (the RD-6 fit from the source repo; the 606 never had one) |
+| Hand Clap | Four timed noise bursts and a diffuse tail |
 
 Every voice has **Tune, Decay, Drive, a Distortion type** (Diode / Hard Clip /
 Wavefolder / Bitcrush) and **Level**, plus a **Master Drive / Distortion**
