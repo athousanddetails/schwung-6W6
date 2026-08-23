@@ -306,7 +306,7 @@
             "type": "enum",
             "options": [
               "Off",
-              "CH > OH",
+              "CH>OH",
               "Mutual"
             ]
           },
@@ -533,7 +533,7 @@
             "type": "enum",
             "options": [
               "Off",
-              "CH > OH",
+              "CH>OH",
               "Mutual"
             ]
           },
@@ -543,7 +543,7 @@
             "full": "Note Map",
             "type": "enum",
             "options": [
-              "Rack",
+              "Rack 36",
               "GM"
             ]
           },

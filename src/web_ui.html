@@ -138,7 +138,7 @@
 
   var DIST  = ["Diode", "Clip", "Fold", "Crush"];
   var MDIST = ["Off", "Diode", "Clip", "Fold", "Crush"];
-  var CHOKE = ["Off", "CH > OH", "Mutual"];
+  var CHOKE = ["Off", "CH>OH", "Mutual"];
 
   /* lanes, in the DSP's order; n = the 606's instrument number style */
   var LANES = [
@@ -259,7 +259,7 @@
   knob(master, "master_drive", "Master Drive");
   var sp2 = document.createElement("div"); sp2.className = "sep"; master.appendChild(sp2);
   sel(master, "hh_choke", "Hat Choke", CHOKE);
-  sel(master, "note_map", "Note Map", ["Rack 36+", "GM"]);
+  sel(master, "note_map", "Note Map", ["Rack 36", "GM"]);
 
   /* ---- sequencer strip ---- */
   var stepsEl = document.getElementById("steps"), leds = [], nums = [];

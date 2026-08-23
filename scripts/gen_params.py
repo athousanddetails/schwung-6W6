@@ -39,7 +39,11 @@ def E(key, label, options, default=0):
 # Post-voice drive stage. The vendored 606 voices have no distortion of their
 # own (only internal saturation), so this is ours — same four flavours as 9W9
 # so the two kits behave identically under the same knob.
-DIST = ["Diode", "Hard Clip", "Wavefolder", "Bitcrush"]
+# Option text is sized for the stock grid's enum box: TWO LINES OF THREE
+# CHARACTERS (two words -> first 3 of each; one word -> chars 0-3 / 3-6,
+# font5x3.mjs enumSquareLines). "Hard Clip" rendered HAR/CLI and "Wavefolder"
+# WAV/EFO; these read DIO/DE, CLI/P, FOL/D, CRU/SH. Order is storage order.
+DIST = ["Diode", "Clip", "Fold", "Crush"]
 def DRIVE(v):  return P(f"{v}_drive", "Drive", 0.2, 8.0, EXP, 55)   # pot 55 == 1.0
 def DTYPE(v):  return E(f"{v}_dist_type", "Distortion", DIST)
 def LEVEL(v):  return P(f"{v}_level", "Level", 0.0, 2.0, LIN, 64)   # pot 64 == 1.0
@@ -92,7 +96,7 @@ PAGES = [
         DRIVE("ch"), DTYPE("ch"), LEVEL("ch"),
         # Lives here as well as on Master: this is where you are standing when
         # you want it. The 606 hardwires CH>OH; here it is a switch.
-        E("hh_choke", "Choke", ["Off", "CH > OH", "Mutual"], 1),
+        E("hh_choke", "Choke", ["Off", "CH>OH", "Mutual"], 1),   # CH>/OH in the box
     ]),
     ("oh", "Open Hat", [
         RATIO("oh"), DECAY("oh", 102), DRIVE("oh"), DTYPE("oh"), LEVEL("oh"),   # 0.8 == as measured
@@ -116,8 +120,8 @@ GLOBALS = [
     # the chain puts after it instead of arriving already clipped.
     P("volume", "Volume", 0.0, 1.0, LIN, 76),
     P("accent", "Accent", 1.0, 4.0, LIN, 42),               # 2.0x on accented hits
-    E("hh_choke", "Choke", ["Off", "CH > OH", "Mutual"], 1),
-    E("note_map", "Note Map", ["Drum Rack (36+)", "General MIDI"]),
+    E("hh_choke", "Choke", ["Off", "CH>OH", "Mutual"], 1),   # CH>/OH in the box
+    E("note_map", "Note Map", ["Rack 36", "GM"]),            # RAC/36 in the box
 ]
 
 # ---------------------------------------------------------------------------
@@ -260,9 +264,7 @@ def movy_slot(p):
     if p["kind"] == "enum":
         d["type"] = "enum"
         # Movy squeezes option text into a 32 px cell: short words only.
-        d["options"] = [o.replace("Hard Clip", "Clip").replace("Wavefolder", "Fold")
-                         .replace("Bitcrush", "Crush").replace("Drum Rack (36+)", "Rack")
-                         .replace("General MIDI", "GM") for o in p["options"]]
+        d["options"] = list(p["options"])   # already sized for a 32 px cell
     else:
         d["type"] = "int"; d["min"] = 0; d["max"] = 127
     return d

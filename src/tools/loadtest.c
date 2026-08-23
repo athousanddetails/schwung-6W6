@@ -88,7 +88,7 @@ int main(int argc, char **argv)
     printf("      chain_params = %d bytes\n", n);
     CHECK(strstr(buf, "\"hh_choke\"") != NULL, "chain_params advertises hh_choke");
     CHECK(strstr(buf, "\"master_dist\"") != NULL, "chain_params advertises master_dist");
-    CHECK(strstr(buf, "Bitcrush") != NULL, "master distortion offers Bitcrush");
+    CHECK(strstr(buf, "\"Crush\"") != NULL, "master distortion offers Crush");
 
     CHECK(api->get_param(inst, "ui_hierarchy", buf, sizeof(buf)) < 0,
           "ui_hierarchy absent (so ui_chain.js engages)");
