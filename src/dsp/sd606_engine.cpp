@@ -16,6 +16,7 @@
 
 #include "sd606_cymbal.h"
 #include "sd606_metal_hw.h"
+#include "sd606_clap_voice.h"
 #include "sd606_metal_voice.h"
 #include "sd606_engine.h"
 #include "sd606_params.h"
@@ -124,7 +125,7 @@ struct sd606_engine {
     SnareVoice      sd;
     TomVoice        lt, ht;
     Sd606MetalVoice ch, oh, cy;   /* forked: see sd606_metal_voice.h */
-    ClapVoice       cp;
+    Sd606ClapVoice  cp;   /* forked: see sd606_clap_voice.h */
 };
 
 const char *sd606_voice_id(int voice)
