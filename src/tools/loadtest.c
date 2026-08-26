@@ -198,6 +198,38 @@ int main(int argc, char **argv)
     }
     render_peak(600);
 
+    /* ---- velocity, under the accent point ----
+     * The accent is a switch, as on the machine. Velocity used to do nothing
+     * beneath it, which made sequenced hat grooves flat. */
+    {
+        api->set_param(inst, "mutes", "0");
+        api->set_param(inst, "vel_depth", "127");        /* live (the default) */
+        render_peak(600); note_on(76, 30);  const double soft = render_peak(60);
+        render_peak(600); note_on(76, 90);  const double mid  = render_peak(60);
+        render_peak(600); note_on(76, 110); const double acc  = render_peak(60);
+        char m2[160];
+        snprintf(m2, sizeof m2, "velocity scales below the accent (30 %.3f < 90 %.3f < accent %.3f)",
+                 soft, mid, acc);
+        CHECK(soft < mid * 0.6 && mid < acc * 0.8, m2);
+
+        /* At depth 0 velocity must do nothing below the accent. "Nothing"
+         * cannot be an exact comparison here: the hat carries free-running
+         * noise, so two identical hits differ by a few percent of peak. Take
+         * that spread as the yardstick and require 30-vs-90 to sit inside it. */
+        api->set_param(inst, "vel_depth", "0");
+        render_peak(600); note_on(76, 90);  const double m0 = render_peak(60);
+        render_peak(600); note_on(76, 90);  const double m1 = render_peak(60);
+        render_peak(600); note_on(76, 30);  const double s0 = render_peak(60);
+        render_peak(600); note_on(76, 110); const double a0 = render_peak(60);
+        const double spread = fabs(m0 - m1);
+        snprintf(m2, sizeof m2,
+                 "depth 0 restores the flat switch (|30-90| %.4f vs run-to-run %.4f, accent %.3f)",
+                 fabs(s0 - m0), spread, a0);
+        CHECK(fabs(s0 - m0) <= spread * 2.0 + 0.005 && a0 > m0 * 1.5, m2);
+        api->set_param(inst, "vel_depth", "127");
+        render_peak(600);
+    }
+
     /* ---- mutes silence a lane and let it back in ---- */
     api->set_param(inst, "mutes", "1");                  /* bit 0 = bass drum */
     note_on(68, 110);

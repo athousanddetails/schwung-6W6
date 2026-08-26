@@ -25,7 +25,7 @@ typedef struct {
     int         def;
 } sd606_enum_t;
 
-#define SD606_NUM_POTS  63
+#define SD606_NUM_POTS  64
 #define SD606_NUM_ENUMS 12
 
 static const sd606_pot_t g_sd606_pots[SD606_NUM_POTS] = {
@@ -68,6 +68,7 @@ static const sd606_pot_t g_sd606_pots[SD606_NUM_POTS] = {
     { "volume",     0.0000f,     1.0000f, SD606_LIN,  76 },
     { "accent",     1.0000f,     4.0000f, SD606_LIN,  42 },
     { "comp",     0.0000f,     1.0000f, SD606_LIN,   0 },
+    { "vel_depth",     0.0000f,     1.0000f, SD606_LIN, 127 },
     { "bd_rev",     0.0000f,     1.0000f, SD606_LIN,   0 },
     { "bd_dly",     0.0000f,     1.0000f, SD606_LIN,   0 },
     { "sd_rev",     0.0000f,     1.0000f, SD606_LIN,   0 },
@@ -109,7 +110,7 @@ static const sd606_enum_t g_sd606_enums[SD606_NUM_ENUMS] = {
     { "dly_time", 13,  7 },
 };
 
-#define SD606_CHAIN_PARAMS_LEN 6761
+#define SD606_CHAIN_PARAMS_LEN 6844
 static const char sd606_chain_params_json[] =
     "[{\"key\":\"bd_tune\",\"name\":\"Tune\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":40},{\"key\":\"bd_decay\",\"name"
     "\":\"Decay\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":24},{\"key\":\"bd_attack\",\"name\":\"Attack\",\"type\":\"in"
@@ -156,31 +157,32 @@ static const char sd606_chain_params_json[] =
     "master_drive\",\"name\":\"Master Drive\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":8},{\"key\":\"volume\",\"nam"
     "e\":\"Volume\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":76,\"viz\":{\"kind\":\"fader\"}},{\"key\":\"accent\",\"nam"
     "e\":\"Accent\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":42},{\"key\":\"comp\",\"name\":\"Comp\",\"type\":\"int\",\"m"
-    "in\":0,\"max\":127,\"default\":0},{\"key\":\"note_map\",\"name\":\"Note Map\",\"type\":\"enum\",\"options\":[\"Rack 36\","
-    "\"GM\"],\"default\":0},{\"key\":\"bd_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\""
-    "bd_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"sd_rev\",\"name\":\"Rev\",\"type\""
-    ":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"sd_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"d"
-    "efault\":0},{\"key\":\"lt_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"lt_dly\","
-    "\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"ht_rev\",\"name\":\"Rev\",\"type\":\"int\",\""
-    "min\":0,\"max\":127,\"default\":0},{\"key\":\"ht_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":"
-    "0},{\"key\":\"ch_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"ch_dly\",\"name\":\""
-    "Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"oh_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\""
-    "max\":127,\"default\":0},{\"key\":\"oh_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key"
-    "\":\"cy_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"cy_dly\",\"name\":\"Dly\",\"ty"
-    "pe\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"cp_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127"
-    ",\"default\":0},{\"key\":\"cp_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"rev_d"
-    "ecay\",\"name\":\"Decay\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":73},{\"key\":\"rev_tone\",\"name\":\"Tone\",\"t"
-    "ype\":\"int\",\"min\":0,\"max\":127,\"default\":57},{\"key\":\"rev_hpf\",\"name\":\"HPF\",\"type\":\"int\",\"min\":0,\"max\":"
-    "127,\"default\":62},{\"key\":\"rev_level\",\"name\":\"Level\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":85,\"viz"
-    "\":{\"kind\":\"fader\"}},{\"key\":\"dly_time\",\"name\":\"Time\",\"type\":\"enum\",\"options\":[\"1/32\",\"1/16T\",\"1/16\",\""
-    "1/8T\",\"1/16.\",\"1/8\",\"1/4T\",\"1/8.\",\"1/4\",\"1/2T\",\"1/4.\",\"1/2\",\"1/2.\"],\"default\":7},{\"key\":\"dly_fdbk\",\""
-    "name\":\"Fdbk\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":52},{\"key\":\"dly_tone\",\"name\":\"Tone\",\"type\":\"in"
-    "t\",\"min\":0,\"max\":127,\"default\":51},{\"key\":\"dly_hpf\",\"name\":\"HPF\",\"type\":\"int\",\"min\":0,\"max\":127,\"def"
-    "ault\":62},{\"key\":\"dly_level\",\"name\":\"Level\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":85,\"viz\":{\"kind"
-    "\":\"fader\"}},{\"key\":\"ui_focus\",\"name\":\"Focus\",\"type\":\"int\",\"min\":0,\"max\":8,\"default\":0},{\"key\":\"mutes"
-    "\",\"name\":\"Mutes\",\"type\":\"int\",\"min\":0,\"max\":255,\"default\":0}]";
+    "in\":0,\"max\":127,\"default\":0},{\"key\":\"vel_depth\",\"name\":\"Velocity\",\"type\":\"int\",\"min\":0,\"max\":127,\"de"
+    "fault\":127},{\"key\":\"note_map\",\"name\":\"Note Map\",\"type\":\"enum\",\"options\":[\"Rack 36\",\"GM\"],\"default\":0"
+    "},{\"key\":\"bd_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"bd_dly\",\"name\":\"D"
+    "ly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"sd_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"m"
+    "ax\":127,\"default\":0},{\"key\":\"sd_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\""
+    ":\"lt_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"lt_dly\",\"name\":\"Dly\",\"typ"
+    "e\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"ht_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,"
+    "\"default\":0},{\"key\":\"ht_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"ch_rev"
+    "\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"ch_dly\",\"name\":\"Dly\",\"type\":\"int\""
+    ",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"oh_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default"
+    "\":0},{\"key\":\"oh_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"cy_rev\",\"name\""
+    ":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"cy_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0"
+    ",\"max\":127,\"default\":0},{\"key\":\"cp_rev\",\"name\":\"Rev\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"k"
+    "ey\":\"cp_dly\",\"name\":\"Dly\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":0},{\"key\":\"rev_decay\",\"name\":\"Dec"
+    "ay\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":73},{\"key\":\"rev_tone\",\"name\":\"Tone\",\"type\":\"int\",\"min\":"
+    "0,\"max\":127,\"default\":57},{\"key\":\"rev_hpf\",\"name\":\"HPF\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":62}"
+    ",{\"key\":\"rev_level\",\"name\":\"Level\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":85,\"viz\":{\"kind\":\"fader\""
+    "}},{\"key\":\"dly_time\",\"name\":\"Time\",\"type\":\"enum\",\"options\":[\"1/32\",\"1/16T\",\"1/16\",\"1/8T\",\"1/16.\",\"1/"
+    "8\",\"1/4T\",\"1/8.\",\"1/4\",\"1/2T\",\"1/4.\",\"1/2\",\"1/2.\"],\"default\":7},{\"key\":\"dly_fdbk\",\"name\":\"Fdbk\",\"typ"
+    "e\":\"int\",\"min\":0,\"max\":127,\"default\":52},{\"key\":\"dly_tone\",\"name\":\"Tone\",\"type\":\"int\",\"min\":0,\"max\":"
+    "127,\"default\":51},{\"key\":\"dly_hpf\",\"name\":\"HPF\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":62},{\"key\":"
+    "\"dly_level\",\"name\":\"Level\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":85,\"viz\":{\"kind\":\"fader\"}},{\"key"
+    "\":\"ui_focus\",\"name\":\"Focus\",\"type\":\"int\",\"min\":0,\"max\":8,\"default\":0},{\"key\":\"mutes\",\"name\":\"Mutes\","
+    "\"type\":\"int\",\"min\":0,\"max\":255,\"default\":0}]";
 
-#define SD606_UI_PAGES_LEN 4225
+#define SD606_UI_PAGES_LEN 4275
 static const char sd606_ui_pages_json[] =
     "{\"levels\":{\"bd\":{\"name\":\"Bass Drum\",\"knobs\":[\"bd_tune\",\"bd_decay\",\"bd_attack\",\"bd_drive\",\"bd_dist_ty"
     "pe\",\"bd_level\",\"bd_rev\",\"bd_dly\"],\"params\":[{\"key\":\"bd_tune\",\"name\":\"Tune\"},{\"key\":\"bd_decay\",\"name\""
@@ -218,12 +220,12 @@ static const char sd606_ui_pages_json[] =
     "y\",\"knobs\":[\"dly_time\",\"dly_fdbk\",\"dly_tone\",\"dly_hpf\",\"dly_level\"],\"params\":[{\"key\":\"dly_time\",\"nam"
     "e\":\"Time\"},{\"key\":\"dly_fdbk\",\"name\":\"Fdbk\"},{\"key\":\"dly_tone\",\"name\":\"Tone\"},{\"key\":\"dly_hpf\",\"name\""
     ":\"HPF\"},{\"key\":\"dly_level\",\"name\":\"Level\"}]},\"root\":{\"name\":\"6W6\",\"knobs\":[\"master_dist\",\"master_dri"
-    "ve\",\"comp\",\"volume\",\"accent\"],\"params\":[{\"level\":\"bd\",\"label\":\"Bass Drum\"},{\"level\":\"sd\",\"label\":\"Sn"
-    "are\"},{\"level\":\"lt\",\"label\":\"Low Tom\"},{\"level\":\"ht\",\"label\":\"Hi Tom\"},{\"level\":\"ch\",\"label\":\"Closed"
-    " Hat\"},{\"level\":\"oh\",\"label\":\"Open Hat\"},{\"level\":\"cy\",\"label\":\"Cymbal\"},{\"level\":\"cp\",\"label\":\"Clap"
-    "\"},{\"level\":\"rev\",\"label\":\"Reverb\"},{\"level\":\"dly\",\"label\":\"Delay\"},{\"key\":\"master_dist\",\"name\":\"Mas"
-    "ter Dist\"},{\"key\":\"master_drive\",\"name\":\"Master Drive\"},{\"key\":\"volume\",\"name\":\"Volume\"},{\"key\":\"acc"
-    "ent\",\"name\":\"Accent\"},{\"key\":\"comp\",\"name\":\"Comp\"},{\"key\":\"hh_choke\",\"name\":\"Choke\"},{\"key\":\"note_ma"
-    "p\",\"name\":\"Note Map\"}]}}}";
+    "ve\",\"comp\",\"volume\",\"accent\",\"vel_depth\"],\"params\":[{\"level\":\"bd\",\"label\":\"Bass Drum\"},{\"level\":\"sd\""
+    ",\"label\":\"Snare\"},{\"level\":\"lt\",\"label\":\"Low Tom\"},{\"level\":\"ht\",\"label\":\"Hi Tom\"},{\"level\":\"ch\",\"la"
+    "bel\":\"Closed Hat\"},{\"level\":\"oh\",\"label\":\"Open Hat\"},{\"level\":\"cy\",\"label\":\"Cymbal\"},{\"level\":\"cp\",\""
+    "label\":\"Clap\"},{\"level\":\"rev\",\"label\":\"Reverb\"},{\"level\":\"dly\",\"label\":\"Delay\"},{\"key\":\"master_dist\""
+    ",\"name\":\"Master Dist\"},{\"key\":\"master_drive\",\"name\":\"Master Drive\"},{\"key\":\"volume\",\"name\":\"Volume\"}"
+    ",{\"key\":\"accent\",\"name\":\"Accent\"},{\"key\":\"comp\",\"name\":\"Comp\"},{\"key\":\"vel_depth\",\"name\":\"Velocity\"}"
+    ",{\"key\":\"hh_choke\",\"name\":\"Choke\"},{\"key\":\"note_map\",\"name\":\"Note Map\"}]}}}";
 
 #endif /* SD606_PARAMS_H */

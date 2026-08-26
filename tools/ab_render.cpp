@@ -1,11 +1,15 @@
 /* Renders a fixed 4-second pattern at default pots to raw float32.
  * Used by tools/ab_null.sh against two builds of the engine. */
 #include <stdio.h>
+#include <stdlib.h>
 #include "sd606_engine.h"
 int main(int argc, char **argv)
 {
     const float sr = 44100.0f;
     sd606_engine_t *e = sd606_create(sr);
+    /* AB_VEL_DEPTH=0 reproduces the pre-velocity behaviour, so the two
+     * builds can be compared on equal terms. */
+    { const char *d = getenv("AB_VEL_DEPTH"); if(d) sd606_set_param(e, "vel_depth", d); }
     const char *pat[SD606_NUM_VOICES] = {
         "X..x..X...x..X..", "....X.......X...", "..............x.",
         "..........x.....", "x.x.x.x.x.x.x.x.", "......x.......x.",

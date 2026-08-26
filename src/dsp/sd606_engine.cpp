@@ -144,7 +144,7 @@ struct sd606_engine {
     int bd_attack, sd_snappy, sd_tone, cp_noise;
     /* Globals. */
     int e_master_dist, e_choke, e_note_map;
-    int p_master_drive, p_volume, p_accent;
+    int p_master_drive, p_volume, p_accent, p_vel_depth;
 
     float crush_master[2];           /* master-stage crush decimator */
 
@@ -217,6 +217,7 @@ sd606_engine_t *sd606_create(float sample_rate)
     e->p_master_drive = find_pot("master_drive");
     e->p_volume       = find_pot("volume");
     e->p_accent       = find_pot("accent");
+    e->p_vel_depth    = find_pot("vel_depth");
     e->e_master_dist  = find_enum("master_dist");
     e->e_choke        = find_enum("hh_choke");
     e->e_note_map     = find_enum("note_map");
@@ -289,8 +290,31 @@ void sd606_trigger(sd606_engine_t *e, int voice, int velocity)
     if(velocity <= 0) return;                       /* note-off: drums are one-shots */
     if(e->mutes & (1u << voice)) return;
 
-    const float accent = velocity >= SD606_ACCENT_VELOCITY
-                       ? e->potv[e->p_accent] : 1.0f;
+    /*
+     * Accent, and the velocity underneath it.
+     *
+     * The switch is the machine's: at or above SD606_ACCENT_VELOCITY the
+     * accent lifts the voice, and below it every note used to come out at
+     * exactly the same level -- which is what made velocity from Move's
+     * sequencer look broken. A hat at 30 and a hat at 90 were identical, so
+     * hat grooves were flat.
+     *
+     * vel_depth blends a continuous law into the SUB-ACCENT range only:
+     * gain = velocity / SD606_ACCENT_VELOCITY, so a note at 99 stays
+     * essentially where it was and the dynamics open up beneath it. Accented
+     * notes keep the accent gain exactly, at every depth, so the accent still
+     * snaps the way the hardware does.
+     */
+    float accent;
+    if(velocity >= SD606_ACCENT_VELOCITY)
+    {
+        accent = e->potv[e->p_accent];
+    }
+    else
+    {
+        const float v = (float)velocity * (1.0f / (float)SD606_ACCENT_VELOCITY);
+        accent = 1.0f + (v - 1.0f) * e->potv[e->p_vel_depth];
+    }
     e->rt[voice].hit_gain   = accent;
     e->rt[voice].choke_gain = 1.0f;
     e->rt[voice].choke_step = 0.0f;

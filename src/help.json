@@ -77,6 +77,28 @@
       ]
     },
     {
+      "title": "Velocity",
+      "lines": [
+        "Accent is a SWITCH,",
+        "like the machine:",
+        "at velocity 100 and",
+        "over, the accent",
+        "level; under it, the",
+        "note used to be the",
+        "same however hard",
+        "you hit - so hat",
+        "grooves came out",
+        "flat.",
+        "",
+        "VELOCITY on Master",
+        "opens that up. Full",
+        "= velocity scales",
+        "the note below the",
+        "accent. Zero = the",
+        "old switch only."
+      ]
+    },
+    {
       "title": "Hats",
       "lines": [
         "Choke (Cl Hat page",

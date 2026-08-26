@@ -31,6 +31,14 @@ every type.
 
 **Hat choke is a switch**: Off, CH cuts OH (the 606's wiring), or Mutual.
 
+**Velocity plays.** Accent is a switch on the real machine — at velocity 100
+and over you get the accent level, and underneath it every note came out
+identical however hard you hit, which left sequenced hat grooves flat. The
+**Velocity** control on Master opens the range beneath the accent: at full,
+gain follows velocity, so a note at 99 sits where it always did and the
+dynamics open up below it. At zero you get the old switch-only behaviour back,
+bit for bit. Accented notes are untouched at any setting.
+
 ## Send FX
 
 Two buses, fed post-fader from every voice by its **Rev** and **Dly** knobs,

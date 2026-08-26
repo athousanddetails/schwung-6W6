@@ -161,6 +161,14 @@ GLOBALS = [
     # it: at zero the stage is not in the path at all (bit-identical), and the
     # knob blends threshold, ratio and auto-makeup together.
     P("comp", "Comp", 0.0, 1.0, LIN, 0),
+    # Velocity depth, ported from 9W9. The 606's accent is a per-step SWITCH,
+    # one bus at one level, so the engine did the same and every note under
+    # the accent point came out identical -- which is why hat grooves were
+    # flat. This blends in a continuous law BELOW the accent point only; at 1
+    # (the default, velocity live) gain is velocity/100, so a note at 99 sits
+    # where it always did and the dynamics open up underneath. Accented notes
+    # keep the accent gain exactly, at every depth.
+    P("vel_depth", "Velocity", 0.0, 1.0, LIN, 127),
     E("hh_choke", "Choke", ["Off", "CH>OH", "Mutual"], 1),   # CH>/OH in the box
     E("note_map", "Note Map", ["Rack 36", "GM"]),            # RAC/36 in the box
 ]
@@ -253,7 +261,8 @@ for pid, label, params in FX_PAGES:
 
 root += [{"key": p["key"], "name": p["name"]} for p in GLOBALS]
 levels["root"] = {"name": "6W6",
-                  "knobs": ["master_dist", "master_drive", "comp", "volume", "accent"],
+                  "knobs": ["master_dist", "master_drive", "comp", "volume", "accent",
+                            "vel_depth"],
                   "params": root}
 
 # Two plugin-level keys that live on NO page but must be in chain_params: the
@@ -334,7 +343,7 @@ static const char sd606_ui_pages_json[] =
 # HARD RULE (cost a debugging session on Tablor): a Movy bank is EXACTLY ONE
 # PAGE. buildConfigPages keys bankGroups per BANK but the UI indexes per PAGE,
 # so a multi-row bank shifts every following page's label. One row per bank.
-SHORT = {"Comp": "COMP", "Rev": "REV", "Dly": "DLY", "Fdbk": "FDBK", "HPF": "HPF", "Time": "TIME",
+SHORT = {"Velocity": "VEL", "Comp": "COMP", "Rev": "REV", "Dly": "DLY", "Fdbk": "FDBK", "HPF": "HPF", "Time": "TIME",
          "Tune": "TUNE", "Decay": "DECAY", "Attack": "ATTK", "Drift": "DRIFT",
          "Drive": "DRIVE", "Distortion": "DIST", "Level": "LEVEL",
          "Snappy": "SNAPY", "Tone": "TONE", "Noise": "NOISE", "Choke": "CHOKE",

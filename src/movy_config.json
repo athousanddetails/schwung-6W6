@@ -766,6 +766,14 @@
             "max": 127
           },
           {
+            "key": "vel_depth",
+            "short": "VEL",
+            "full": "Velocity",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
             "key": "hh_choke",
             "short": "CHOKE",
             "full": "Choke",
@@ -785,8 +793,7 @@
               "Rack 36",
               "GM"
             ]
-          },
-          null
+          }
         ]
       ]
     }
