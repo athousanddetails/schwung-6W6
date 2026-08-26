@@ -13,29 +13,57 @@ a spare pad is a spare pad.
 
 | Voice | Engine |
 |---|---|
-| Bass Drum | Swept sine body, filtered noise and impulse transients — short and clicky like the 606, not the long 808-style tail |
-| Snare | Tuned shell plus two bandpass-shaped noise "wires"; Snappy moves only the wires |
+| Bass Drum | Swept sine body, filtered noise and impulse transients — short and clicky like the 606, not the long 808-style tail. No per-hit drift: a 606 kick does not wander |
+| Snare | Tuned shell plus two bandpass-shaped noise "wires". Snappy sets how much wire there is, Tone colours it — turn Snappy up or Tone has nothing to work on. No decay control, because the machine has none |
 | Low / Hi Tom | Main mode with quieter resonances around it; the low tom falls into pitch, the high tom leaves a lower ring |
 | Closed / Open Hat | One metal bank of 32 measured partials — fitted from a hardware 606's hats — under two envelopes, like the circuit |
 | Cymbal | The same metal source with its own 32-line table measured off a hardware cymbal, down to 266 Hz where a hat's table stops at 3.7 kHz |
 | Hand Clap | Four timed noise bursts and a diffuse tail |
 
-Every voice has **Tune, Decay, Drive, a Distortion type** (Diode / Hard Clip /
-Wavefolder / Bitcrush) and **Level**, plus a **Master Drive / Distortion**
-across the kit. Every continuous control is a **0–127 pot**; centre is the
-fitted 606. **Hat choke is a switch**: Off, CH cuts OH (the 606's wiring), or
-Mutual.
+Every voice has **Tune, Decay, Drive, a Distortion type, Level** and a pair of
+**send amounts (Rev, Dly)**. Every continuous control is a **0–127 pot**, and
+its default position is the fitted 606.
+
+**Seven distortion types** — Diode, Clip, SAT, BFZ, PDIST, Fold, Crush — per
+voice and again on the master bus, where Crush decimates as well as quantises.
+**Drive fully down is exactly dry**: the stage is not in the path at all, for
+every type.
+
+**Hat choke is a switch**: Off, CH cuts OH (the 606's wiring), or Mutual.
+
+## Send FX
+
+Two buses, fed post-fader from every voice by its **Rev** and **Dly** knobs,
+returned before the master distortion so that stage works on the wet signal
+too. Both are silent at zero, so the kit is untouched until you send it
+something.
+
+| | |
+|---|---|
+| **Reverb** | Four combs into two allpasses with a 12-bit loop. Decay, Tone, HPF, Level |
+| **Delay** | Time is a **note division**, not milliseconds, and follows the host tempo — it stays in time when you change BPM. Feedback darkens each repeat. Time, Fdbk, Tone, HPF, Level |
+
+**Comp** on the Master page is one-knob bus glue — threshold, ratio and
+auto-makeup on a single control. Not 606 circuitry, and at zero it is not in
+the signal path at all.
 
 ## Workflow on the Move
 
 - **Pads (left 4×4)** play and select drums; the parameter page follows what
-  you hit. Row 1: BD SD LT HT. Row 2: CH OH CY CP. **Shift+Pad** selects
-  silently (works during playback). **Mute+Pad** mutes that drum (`[M]` in the
-  title bar). Pad 16 opens **Master**.
+  you hit. Row 1: BD SD LT HT. Row 2: CH OH CY CP. Pads **9, 10, 11** open
+  **Master**, **Reverb** and **Delay** — they switch the page and never sound.
+  **Shift+Pad** selects silently (works during playback). **Mute+Pad** mutes
+  that drum (`[M]` in the title bar).
+- **Move's own gestures win.** Hold **Delete** or **Copy** and every pad passes
+  straight through to Move, page pads included, so you can select and clear
+  steps on any of them.
 - **Knobs 1–8** edit the visible page, drawn with Schwung's stock knob grid
   (host 0.12.1+): **jog** cycles pages, **Shift+Jog** jumps sections, **jog
   click** opens the section list, **Shift** reveals values / fine mode,
   **Mute+knob** resets a pot to its fitted default.
+- **Jog click on the Main page locks it** (`[L]` in the title bar). Pads keep
+  playing and recording, but the page stops following them, so the master
+  knobs stay under your hands while you jam. Shift+Pad still navigates.
 - **Sequencing:** use Move's own sequencer — a drum track with a kit, muted
   (HiJack), track MIDI OUT on the slot's channel. Each drum is its own lane.
   Note map: drum rack (36–43, default) or General MIDI, switchable.
@@ -45,8 +73,9 @@ Mutual.
 ## Remote panel
 
 A TR-606-style panel in the browser — level knobs across the top, an
-INSTRUMENT selector and the selected drum's controls. It follows the device:
-hit a pad on Move and the panel switches to that drum.
+INSTRUMENT selector and the selected drum's controls, with **REV** and **DLY**
+beside the eight voices for the two send buses. It follows the device: hit a
+pad on Move and the panel switches to that drum.
 
 Open port 7700 on whatever address the Move is on, then `/remote-ui`, while
 6W6 is the slot's synth — `move.local:7700` over WiFi, or `172.16.254.1:7700`
