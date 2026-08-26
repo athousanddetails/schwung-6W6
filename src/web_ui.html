@@ -94,6 +94,12 @@
   .shead { display: flex; align-items: center; justify-content: space-between;
            border-bottom: 1px solid #8a8a86; margin-bottom: 5px; padding-bottom: 2px; }
   .sect.mast .shead { border-color: #555; }
+  /* the bottom bar holds three labelled groups side by side */
+  .grp { display: flex; flex-direction: column; gap: 3px; }
+  .gname { font: 800 9px/1 Helvetica, Arial; letter-spacing: 2px; color: var(--red);
+           text-transform: uppercase; }
+  .sect.mast .row { flex-wrap: wrap; gap: 4px 10px; align-items: flex-start; }
+  .vsep { width: 1px; align-self: stretch; background: #555; margin: 0 2px; }
   .sname { font: 800 10px/1 Helvetica, Arial; letter-spacing: 2px; text-transform: uppercase; }
   .sect .row { flex-wrap: nowrap; gap: 2px 4px; align-items: flex-end; }
   .sect .cell { width: 54px; flex: 0 0 54px; }
@@ -298,8 +304,31 @@
       pot(V.id + "_rev", "Rev"), pot(V.id + "_dly", "Dly") ]) };
     sectEls[i] = section(def, "", i);
   });
-  BUSES.forEach(function (B) { section(B, "bus"); });
-  section({ name: "Master", knobs: MASTER }, "mast");
+  /*
+   * The two send buses live on the master bar, not in the voice grid: they
+   * are bus processing, the same as the master stage, and grouping them there
+   * keeps the grid above purely about drums.
+   */
+  (function bottomBar() {
+    var box = document.createElement("div"); box.className = "sect mast";
+    var head = document.createElement("div"); head.className = "shead";
+    var nm = document.createElement("span"); nm.className = "sname";
+    nm.textContent = "Bus"; head.appendChild(nm);
+    box.appendChild(head);
+    var row = document.createElement("div"); row.className = "row";
+    var groups = BUSES.concat([{ id: "master", name: "Master", knobs: MASTER }]);
+    groups.forEach(function (G, i) {
+      if (i) { var v = document.createElement("div"); v.className = "vsep"; row.appendChild(v); }
+      var grp = document.createElement("div"); grp.className = "grp";
+      var gn = document.createElement("div"); gn.className = "gname"; gn.textContent = G.name;
+      var inner = document.createElement("div"); inner.className = "row";
+      G.knobs.forEach(function (kn) { control(inner, kn); });
+      grp.appendChild(gn); grp.appendChild(inner);
+      row.appendChild(grp);
+    });
+    box.appendChild(row);
+    rack.appendChild(box);
+  })();
 
   function renderMutes() {
     Object.keys(muteBtns).forEach(function (lane) {
