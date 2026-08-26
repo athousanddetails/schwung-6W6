@@ -53,8 +53,6 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
      * only about which lane's MUTE the title bar reflects. */
     var LEVEL2FOCUS = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7,
                         root: 8, rev: 9, dly: 10 };
-    var FOCUS2LEVEL = ["bd", "sd", "lt", "ht", "ch", "oh", "cy", "cp",
-                       "root", "rev", "dly"];
 
     /* page key -> lane whose mute the title indicator shows (-1 = none) */
     var LEVEL2LANE = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7,
@@ -152,7 +150,6 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
      * page id so the remote panel follows. A set_param, not a read: the shim
      * only tells schwung-manager about WRITES. */
     var lastFocus = -1;
-    var focusPoll = 0;
     function goToLevel(levelKey) {
         if (!controller) return;
         /* Publishing the page is the TICK's job, not this function's: the
@@ -233,31 +230,18 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
         controller.setReveal(shiftHeld());
 
         /*
-         * Page sync with the remote panel, both ways.
-         *
-         * OUT: publish whatever page is on screen, however it got there --
-         * pads used to be the only thing that announced it, so jogging to
-         * another page left the panel behind.
-         *
-         * IN: the panel writes the same key when you pick an instrument
-         * there. Poll it rarely: a param read is a ~2.8 ms round-trip, more
-         * than a whole page render, so once every 8 ticks (~7 Hz) is plenty
-         * for a page switch and costs almost nothing. Only read when we have
-         * nothing to announce, so the two directions never fight.
+         * Publish whichever page is on screen, however it got there -- pad or
+         * jog. The remote panel HIGHLIGHTS the voice you are on; it does not
+         * follow it, because every control is visible there at once and there
+         * is no page to switch. So this is one-way and one write per page
+         * change, nothing more.
          */
         var focusNow = LEVEL2FOCUS[controller.page ? controller.page.level : null];
         if (focusNow === undefined) focusNow = 8;
         if (focusNow !== lastFocus) {
             lastFocus = focusNow;
             ctlSetParam("synth:ui_focus", String(focusNow));
-        } else if ((++focusPoll & 7) === 0) {
-            var want = parseInt(ctlGetParam("synth:ui_focus"), 10);
-            if (!isNaN(want) && want !== lastFocus && FOCUS2LEVEL[want]) {
-                lastFocus = want;
-                goToLevel(FOCUS2LEVEL[want]);
-            }
         }
-        controller.tick();
 
         /* The grid paces its own redraws; draw every tick like the stock
          * binding does (a full page render is ~1.6 ms, measured upstream). */

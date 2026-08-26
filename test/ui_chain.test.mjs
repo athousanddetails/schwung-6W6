@@ -83,6 +83,8 @@ const off  = n => ui.onMidiMessageInternal(new Uint8Array([0x80, n, 0]));
  * is published however the page moved (pad, jog, or the panel asking). Hitting
  * a pad and reading setLog without a frame in between sees nothing. */
 const hit = (n, v = 100) => { note(n, v); off(n); ui.tick(); };
+const jogClick = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 3, 127]));
+const jogTurn  = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1]));
 
 /* plain pad: reaches Move, no param writes */
 injected = []; setLog.length = 0;
@@ -124,21 +126,17 @@ check(true, "tick with a muted lane renders");
 ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 127])); note(78, 100); off(78); ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 0]));
 check(params["synth:mutes"] === "0", "second Mute+Pad clears it");
 
-/* ---- the panel can drive the device, not just watch it ----
- * The panel writes synth:ui_focus when you pick an instrument there; the
- * editor polls it and follows. Without this the device's own announcement
- * pushed straight back and the panel snapped to whatever the Move was on. */
+/* ---- the page is published however it moved ----
+ * The panel shows every control at once, so it never switches pages and never
+ * writes this key -- it only highlights. One write per change, one direction. */
 {
-  hit(68);                                   /* device on the kick */
-  params["synth:ui_focus"] = "3";             /* the panel asks for Hi Tom */
-  setLog.length = 0;
-  for (let i = 0; i < 10; i++) ui.tick();     /* polled once every 8 ticks */
-  check(!setLog.some(([k, v]) => k === "synth:ui_focus" && v === "0"),
-        "the editor does not argue back with its old page");
-  params["synth:ui_focus"] = "9";             /* and a bus page */
-  for (let i = 0; i < 10; i++) ui.tick();
-  check(spied.title != null, "still rendering after following the panel");
   hit(68);
+  setLog.length = 0;
+  for (let i = 0; i < 10; i++) ui.tick();
+  check(setLog.length === 0, "sitting on a page writes nothing at all");
+  jogTurn(); ui.tick();
+  check(setLog.some(([k]) => k === "synth:ui_focus"),
+        "jogging to another page publishes it (not just pads)");
 }
 
 /* ---- Move's own gestures win: Delete/Copy + Pad ----
@@ -161,8 +159,6 @@ note(84, 100); off(84);
 check(injected.length === 0, "with Delete released, the Master pad is swallowed again");
 
 /* ---- Main-page jog lock ---- */
-const jogClick = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 3, 127]));
-const jogTurn  = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1]));
 
 /* get to Main, then arm the lock with a click there */
 note(84, 100); off(84); ui.tick();

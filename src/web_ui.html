@@ -79,34 +79,46 @@
   .strip .hdr { display: flex; justify-content: space-between; align-items: center;
                 font-size: 9px; letter-spacing: 1.5px; margin-bottom: 8px; color: #ddd; }
   .foot { font-size: 9px; color: #bbb; text-align: right; margin-top: 6px; }
+  /* --- stacked sections: everything visible, 9W9-style, 606 colours --- */
+  .rack { display: flex; flex-wrap: wrap; gap: 6px; }
+  /* 7 controls x 54px + gaps + padding — sized so a voice never wraps onto a
+     second line, which left ragged half-empty boxes. */
+  .sect { background: linear-gradient(180deg, #d2d2ce, var(--silver2));
+          border: 1px solid #8a8a86; border-radius: 4px; padding: 5px 8px 6px;
+          flex: 1 1 418px; min-width: 418px; }
+  .sect.bus  { flex: 1 1 418px; }
+  .sect.mast { background: linear-gradient(180deg, #2f2f2f, #1e1e1e); color: #eee;
+               border-color: #000; flex-basis: 100%; }
+  .sect.mast .legend, .sect.mast .val { color: #ddd; }
+  .sect.on { box-shadow: inset 0 0 0 2px var(--red); }   /* the voice the Move is on */
+  .shead { display: flex; align-items: center; justify-content: space-between;
+           border-bottom: 1px solid #8a8a86; margin-bottom: 5px; padding-bottom: 2px; }
+  .sect.mast .shead { border-color: #555; }
+  .sname { font: 800 10px/1 Helvetica, Arial; letter-spacing: 2px; text-transform: uppercase; }
+  .sect .row { flex-wrap: nowrap; gap: 2px 4px; align-items: flex-end; }
+  .sect .cell { width: 54px; flex: 0 0 54px; }
+  .sect .legend { white-space: nowrap; overflow: hidden; }
+  .sect .knob { width: 34px; height: 34px; }
+  .sect .knob .ptr { height: 13px; }
+  .sect select { width: 58px; height: 20px; }
 </style>
 </head>
 <body>
 <div class="machine">
 
-  <!-- top panel: brand + level knobs, like the 606's top strip -->
+  <!-- top panel: the 606's own face — accent, a level per voice, volume -->
   <div class="panel">
     <div class="brand"><div class="logo">6W6</div><div class="model">Drumatix</div></div>
     <div class="row" id="levels" style="margin-top:6px"></div>
   </div>
 
-  <!-- middle panel: instrument selector, the selected voice's controls, master -->
-  <div class="panel lower">
-    <div class="row" style="align-items:center; margin-bottom:8px">
-      <div class="legend">Instrument</div>
-      <div class="inst" id="inst"></div>
-      <div class="grow"></div>
-      <button class="mute" id="mute">MUTE</button>
-      <div class="sep"></div>
-      <div class="model" style="font-size:18px"><b>TR</b>-606 <span style="font-size:11px; font-weight:400">Computer Controlled</span></div>
-    </div>
-    <div class="row" id="voice"></div>
-    <div class="row" id="master" style="margin-top:10px; padding-top:8px; border-top:1px solid #8a8a86"></div>
-  </div>
+  <!-- everything else, all of it, at once -->
+  <div class="rack" id="rack"></div>
 
-  <div class="strip">
-    <div class="hdr"><span id="lane-name">BASS DRUM</span><span>FOLLOWS THE PAD YOU HIT ON MOVE</span><span></span></div>
-    <div class="foot">by athousanddetails &middot; voices after 606-Inspired-Synth-Drums (MIT) &middot; drag knobs vertically, double-click to reset</div>
+  <div class="strip" style="margin-top:6px">
+    <div class="hdr"><span id="focus-note">&nbsp;</span>
+      <span>DRAG KNOBS &middot; DOUBLE-CLICK RESETS TO THE FITTED 606</span></div>
+    <div class="foot">by athousanddetails &middot; voices after 606-Inspired-Synth-Drums (MIT)</div>
   </div>
 </div>
 
@@ -115,7 +127,7 @@
 (function () {
   "use strict";
 
-  /* Degrade instead of dying if the bridge script is missing (headless
+  /* Degrade instead of dying if the bridge script is missing (a headless
    * screenshot, or schwung-manager not serving /static): every control still
    * draws, nothing is sent anywhere. */
   if (!window.schwungRemote) {
@@ -129,214 +141,207 @@
   var DIVS  = ["1/32", "1/16T", "1/16", "1/8T", "1/16.", "1/8", "1/4T",
                "1/8.", "1/4", "1/2T", "1/4.", "1/2", "1/2."];
 
-  /* lanes, in the DSP's order; n = the 606's instrument number style */
-  var LANES = [
-    { id: "bd", name: "BASS DRUM", extras: [["bd_attack","Attack"]] },
-    /* no Decay: the 606 snare has no such control; it is pinned to the fit */
-    { id: "sd", name: "SNARE DRUM", noDecay: true, extras: [["sd_snappy","Snappy"],["sd_tone","Tone"]] },
-    { id: "lt", name: "LOW TOM",   extras: [] },
-    { id: "ht", name: "HI TOM",    extras: [] },
-    { id: "ch", name: "CLOSED HAT",extras: [["hh_choke","Choke",CHOKE]] },
-    { id: "oh", name: "OPEN HAT",  extras: [] },
-    { id: "cy", name: "CYMBAL",    extras: [] },
-    { id: "cp", name: "HAND CLAP", extras: [["cp_noise","Noise"]] }
+  function pot(k, n)      { return { k: k, n: n }; }
+  function en(k, n, opts) { return { k: k, n: n, opts: opts }; }
+
+  /*
+   * EVERY control is on screen at once. There is no instrument selector and
+   * no page switching, which is the point: the browser's one advantage over
+   * the Move's 8-knob screen is space, and hiding seven voices behind a
+   * selector threw that away. It also removes a whole class of bug -- with
+   * nothing to switch, the panel and the device can never disagree about
+   * which page is showing, so nothing needs to be sent to keep them in step.
+   * The device's current voice is merely HIGHLIGHTED, read-only.
+   *
+   * Level lives in the top strip, not in the rows: that strip is the 606's
+   * own face (accent, a level per voice, volume) and repeating Level here
+   * would be duplication.
+   */
+  var VOICES = [
+    { id: "bd", name: "Bass Drum",  knobs: [pot("bd_tune","Tune"), pot("bd_decay","Decay"),
+                                            pot("bd_attack","Attack")] },
+    { id: "sd", name: "Snare",      knobs: [pot("sd_tune","Tune"), pot("sd_snappy","Snappy"),
+                                            pot("sd_tone","Tone")] },
+    { id: "lt", name: "Low Tom",    knobs: [pot("lt_tune","Tune"), pot("lt_decay","Decay")] },
+    { id: "ht", name: "Hi Tom",     knobs: [pot("ht_tune","Tune"), pot("ht_decay","Decay")] },
+    { id: "ch", name: "Closed Hat", knobs: [pot("ch_tune","Tune"), pot("ch_decay","Decay"),
+                                            en("hh_choke","Choke",CHOKE)] },
+    { id: "oh", name: "Open Hat",   knobs: [pot("oh_tune","Tune"), pot("oh_decay","Decay")] },
+    { id: "cy", name: "Cymbal",     knobs: [pot("cy_tune","Tune"), pot("cy_decay","Decay")] },
+    { id: "cp", name: "Hand Clap",  knobs: [pot("cp_tune","Tune"), pot("cp_decay","Decay"),
+                                            pot("cp_noise","Noise")] }
   ];
 
-  /* The two send buses, reachable from the same selector -- they are pads 10
-   * and 11 on the device, right beside Master. No lane, so no mute button. */
-  var FX = [
-    { id: "rev", name: "REVERB", knobs: [["rev_decay","Decay"],["rev_tone","Tone"],
-                                         ["rev_hpf","HPF"],["rev_level","Level"]] },
-    { id: "dly", name: "DELAY",  knobs: [["dly_time","Time",DIVS],["dly_fdbk","Fdbk"],
-                                         ["dly_tone","Tone"],["dly_hpf","HPF"],
-                                         ["dly_level","Level"]] }
+  var BUSES = [
+    { id: "rev", name: "Reverb", knobs: [pot("rev_decay","Decay"), pot("rev_tone","Tone"),
+                                         pot("rev_hpf","HPF"), pot("rev_level","Level")] },
+    { id: "dly", name: "Delay",  knobs: [en("dly_time","Time",DIVS), pot("dly_fdbk","Fdbk"),
+                                         pot("dly_tone","Tone"), pot("dly_hpf","HPF"),
+                                         pot("dly_level","Level")] }
   ];
 
-  var state = {}, widgets = {}, mutesMask = 0, lane = 0;
-  var persistentKeys = [];   /* widgets outside the swappable voice row */
+  var MASTER = [ en("master_dist","M.Dist",MDIST), pot("master_drive","M.Drive"),
+                 pot("comp","Comp"), en("hh_choke","Choke",CHOKE),
+                 en("note_map","Notes",["Rack 36","GM"]) ];
+
+  var state = {}, widgets = {}, mutesMask = 0, muteBtns = {}, sectEls = {};
+
   function key(k) { return "synth:" + k; }
   function addWidget(k, fn) { (widgets[k] = widgets[k] || []).push(fn); }
   function send(k, v) {
-    state[k] = v; schwungRemote.setParam(key(k), String(v));
-    (widgets[k] || []).forEach(function (fn) { fn(v); });
-  }
-  function apply(k, raw) {
-    if (k === "ui_focus") {
-      var ln = parseInt(raw, 10);   /* 0-7 voice, 8 master, 9 reverb, 10 delay */
-      if (ln >= 9 && ln - 9 < FX.length) {
-        if (LANES.length + (ln - 9) !== lane) selectLane(LANES.length + (ln - 9), true);
-        return;
-      }
-      if (ln >= 0 && ln < LANES.length && ln !== lane) selectLane(ln, true);
-      return;
-    }
-    var v = parseInt(raw, 10); if (isNaN(v)) return;
-    if (k === "mutes") { mutesMask = v; renderMute(); return; }
-    state[k] = v;                    /* cache first: a page you have not
-                                        opened yet still needs its values */
-    if (widgets[k]) widgets[k].forEach(function (fn) { fn(v); });
+    state[k] = v;
+    schwungRemote.setParam(key(k), String(v));
+    (widgets[k] || []).forEach(function (fn) { fn(v); });   /* keys shown twice stay in step */
   }
 
-  /* ---- widgets ---- */
-  function knob(parent, k, label, big) {
-    var cell = document.createElement("div"); cell.className = "cell" + (big ? " wide" : "");
-    var lg = document.createElement("div"); lg.className = "legend"; lg.textContent = label;
-    var kn = document.createElement("div"); kn.className = "knob" + (big ? " big" : "");
+  function knob(parent, kn) {
+    var cell = document.createElement("div"); cell.className = "cell";
+    var lg = document.createElement("div"); lg.className = "legend"; lg.textContent = kn.n;
+    var el = document.createElement("div"); el.className = "knob";
     var tk = document.createElement("div"); tk.className = "ticks";
     var ptr = document.createElement("div"); ptr.className = "ptr";
-    kn.appendChild(tk); kn.appendChild(ptr);
+    el.appendChild(tk); el.appendChild(ptr);
     var val = document.createElement("div"); val.className = "val";
     function render(v) {
       ptr.style.transform = "translate(-50%,0) rotate(" + (-135 + v / 127 * 270 + 180) + "deg)";
       val.textContent = v;
     }
-    addWidget(k, render);
+    addWidget(kn.k, render);
     var y0 = null, v0 = 0;
     function move(e) {
       if (y0 === null) return;
       var y = e.touches ? e.touches[0].clientY : e.clientY;
       var v = Math.max(0, Math.min(127, Math.round(v0 + (y0 - y) * 0.7)));
-      if (v !== state[k]) send(k, v);
+      if (v !== state[kn.k]) send(kn.k, v);
       e.preventDefault();
     }
-    function up() { y0 = null; window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up);
-                    window.removeEventListener("touchmove", move); window.removeEventListener("touchend", up); }
+    function up() { y0 = null;
+      window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up);
+      window.removeEventListener("touchmove", move); window.removeEventListener("touchend", up); }
     function down(e) {
-      y0 = e.touches ? e.touches[0].clientY : e.clientY; v0 = state[k] | 0;
+      y0 = e.touches ? e.touches[0].clientY : e.clientY; v0 = state[kn.k] | 0;
       window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
-      window.addEventListener("touchmove", move, { passive: false }); window.addEventListener("touchend", up);
+      window.addEventListener("touchmove", move, { passive: false });
+      window.addEventListener("touchend", up);
       e.preventDefault();
     }
-    kn.addEventListener("mousedown", down); kn.addEventListener("touchstart", down, { passive: false });
-    /* reset = the DSP's fitted default, not a guessed 64 */
-    kn.addEventListener("dblclick", function () {
-      schwungRemote.setParam(key(k), "default");
-      setTimeout(function () { schwungRemote.getParam(key(k)).then(function (v) { apply(k, v); }); }, 120);
+    el.addEventListener("mousedown", down);
+    el.addEventListener("touchstart", down, { passive: false });
+    /* reset = the DSP's own fitted default, never a guessed 64: this kit's
+     * defaults were fitted against hardware and most are not centred */
+    el.addEventListener("dblclick", function () {
+      schwungRemote.setParam(key(kn.k), "default");
+      setTimeout(function () {
+        schwungRemote.getParam(key(kn.k)).then(function (v) { apply(kn.k, v); });
+      }, 120);
     });
-    cell.appendChild(lg); cell.appendChild(kn); cell.appendChild(val);
-    parent.appendChild(cell); render(state[k] | 0);
+    cell.appendChild(lg); cell.appendChild(el); cell.appendChild(val);
+    parent.appendChild(cell); render(state[kn.k] | 0);
   }
-  function sel(parent, k, label, opts) {
+
+  function sel(parent, kn) {
     var cell = document.createElement("div"); cell.className = "cell";
-    var lg = document.createElement("div"); lg.className = "legend"; lg.textContent = label;
+    var lg = document.createElement("div"); lg.className = "legend"; lg.textContent = kn.n;
     var s = document.createElement("select");
-    opts.forEach(function (o, i) { var op = document.createElement("option"); op.value = i; op.textContent = o; s.appendChild(op); });
-    s.addEventListener("change", function () { send(k, s.value | 0); });
-    addWidget(k, function (v) { s.value = Math.min(v, opts.length - 1); });
+    kn.opts.forEach(function (o, i) {
+      var op = document.createElement("option"); op.value = i; op.textContent = o; s.appendChild(op);
+    });
+    s.addEventListener("change", function () { send(kn.k, s.value | 0); });
+    addWidget(kn.k, function (v) { s.value = Math.min(v, kn.opts.length - 1); });
     cell.appendChild(lg); cell.appendChild(s); parent.appendChild(cell);
-    s.value = state[k] | 0;
+    s.value = state[kn.k] | 0;
   }
 
-  /* ---- top strip: accent + one level knob per voice + volume ---- */
+  function control(parent, kn) { if (kn.opts) sel(parent, kn); else knob(parent, kn); }
+
+  /* ---- the 606 face: accent, a level per voice, volume ---- */
   var top = document.getElementById("levels");
-  knob(top, "accent", "Accent");
+  knob(top, pot("accent", "Accent"));
   var sepA = document.createElement("div"); sepA.className = "sep"; top.appendChild(sepA);
-  LANES.forEach(function (L) { knob(top, L.id + "_level", L.name.replace(" DRUM", "").replace("HAND ", "")); });
+  /* the level strip labels the voices, so it uses short names */
+  var SHORTNAME = { bd: "Bass", sd: "Snare", lt: "Lo Tom", ht: "Hi Tom",
+                    ch: "Cl Hat", oh: "Op Hat", cy: "Cymbal", cp: "Clap" };
+  VOICES.forEach(function (V) { knob(top, pot(V.id + "_level", SHORTNAME[V.id])); });
   var grow = document.createElement("div"); grow.className = "grow"; top.appendChild(grow);
-  knob(top, "volume", "Volume", true);
+  knob(top, pot("volume", "Volume"));
 
-  /* ---- instrument selector ---- */
-  var inst = document.getElementById("inst"), instBtns = [];
-  LANES.concat(FX).forEach(function (L, i) {
-    var b = document.createElement("button");
-    b.innerHTML = i < LANES.length
-        ? '<span class="n">' + (i + 1) + '</span>' + L.id.toUpperCase()
-        : L.id.toUpperCase();
-    b.addEventListener("click", function () { selectLane(i); });
-    inst.appendChild(b); instBtns.push(b);
-  });
-  var muteBtn = document.getElementById("mute");
-  muteBtn.addEventListener("click", function () {
-    if (lane >= LANES.length) return;              /* the FX pages have no lane */
-    mutesMask = (mutesMask ^ (1 << lane)) & 0xFF;
-    schwungRemote.setParam(key("mutes"), String(mutesMask)); renderMute();
-  });
-  function renderMute() {
-    const isVoice = lane < LANES.length;
-    muteBtn.style.visibility = isVoice ? "visible" : "hidden";
-    muteBtn.className = "mute" + (isVoice && ((mutesMask >> lane) & 1) ? " on" : "");
-  }
+  /* ---- one section per voice, then the two buses, then master ---- */
+  var rack = document.getElementById("rack");
 
-  /* ---- selected voice's controls ---- */
-  var voiceRow = document.getElementById("voice");
-  function addSep() {
-    var sp = document.createElement("div"); sp.className = "sep"; voiceRow.appendChild(sp);
-  }
-
-  function buildVoice() {
-    /* Drop the widgets belonging to the page being replaced -- they point at
-     * DOM that is about to be detached, and without this the list grows on
-     * every switch and every update walks the dead ones too. The header,
-     * master row and level strip are rebuilt from `keep`. */
-    var keep = {};
-    persistentKeys.forEach(function (k) { if (widgets[k]) keep[k] = widgets[k]; });
-    widgets = keep;
-    voiceRow.innerHTML = "";
-    if (lane >= LANES.length) {                    /* a send bus, not a voice */
-      var F = FX[lane - LANES.length];
-      F.knobs.forEach(function (x) {
-        if (x[2]) sel(voiceRow, x[0], x[1], x[2]); else knob(voiceRow, x[0], x[1]);
+  function section(def, cls, lane) {
+    var box = document.createElement("div"); box.className = "sect" + (cls ? " " + cls : "");
+    var head = document.createElement("div"); head.className = "shead";
+    var nm = document.createElement("span"); nm.className = "sname"; nm.textContent = def.name;
+    head.appendChild(nm);
+    if (lane !== undefined) {
+      var mb = document.createElement("div"); mb.className = "mute"; mb.textContent = "MUTE";
+      mb.addEventListener("click", function () {
+        mutesMask = (mutesMask ^ (1 << lane)) & 0xFF;
+        schwungRemote.setParam(key("mutes"), String(mutesMask));
+        renderMutes();
       });
-      return;
+      muteBtns[lane] = mb; head.appendChild(mb);
     }
-    var L = LANES[lane], id = L.id;
-    knob(voiceRow, id + "_tune", "Tune");
-    if (!L.noDecay) knob(voiceRow, id + "_decay", "Decay");
-    L.extras.forEach(function (x) { if (x[2]) sel(voiceRow, x[0], x[1], x[2]); else knob(voiceRow, x[0], x[1]); });
-    addSep();
-    knob(voiceRow, id + "_drive", "Drive");
-    sel(voiceRow, id + "_dist_type", "Distortion", DIST);
-    addSep();
-    knob(voiceRow, id + "_rev", "Rev");
-    knob(voiceRow, id + "_dly", "Dly");
+    box.appendChild(head);
+    var row = document.createElement("div"); row.className = "row";
+    def.knobs.forEach(function (kn) { control(row, kn); });
+    box.appendChild(row);
+    rack.appendChild(box);
+    return box;
   }
 
-  /* ---- master ---- */
-  var master = document.getElementById("master");
-  sel(master, "master_dist", "Master Dist", MDIST);
-  knob(master, "master_drive", "Master Drive");
-  knob(master, "comp", "Comp");
-  var sp2 = document.createElement("div"); sp2.className = "sep"; master.appendChild(sp2);
-  sel(master, "hh_choke", "Hat Choke", CHOKE);
-  sel(master, "note_map", "Note Map", ["Rack 36", "GM"]);
+  VOICES.forEach(function (V, i) {
+    /* Drive, Distortion and the two sends are on every voice, so they are
+     * appended here rather than repeated in each definition above. */
+    var def = { name: V.name, knobs: V.knobs.concat([
+      pot(V.id + "_drive", "Drive"), en(V.id + "_dist_type", "Dist", DIST),
+      pot(V.id + "_rev", "Rev"), pot(V.id + "_dly", "Dly") ]) };
+    sectEls[i] = section(def, "", i);
+  });
+  BUSES.forEach(function (B) { section(B, "bus"); });
+  section({ name: "Master", knobs: MASTER }, "mast");
 
-  function selectLane(i, fromDevice) {
-    lane = i;
-    /* Bidirectional. Picking an instrument here tells the device to show the
-     * same page; without this the device's own ui_focus pushes straight back
-     * and the panel snaps to whatever the Move is on. Not echoed when the
-     * device is the one that asked. */
-    if (!fromDevice) {
-      var focus = i < LANES.length ? i : LANES.length + 1 + (i - LANES.length);
-      schwungRemote.setParam(key("ui_focus"), String(focus));
-    }
-    instBtns.forEach(function (b, j) { b.className = j === i ? "on" : ""; });
-    document.getElementById("lane-name").textContent =
-        (i < LANES.length ? LANES[i] : FX[i - LANES.length]).name;
-    buildVoice(); renderMute();
-    seed();
+  function renderMutes() {
+    Object.keys(muteBtns).forEach(function (lane) {
+      muteBtns[lane].className = "mute" + ((mutesMask >> lane) & 1 ? " on" : "");
+    });
   }
 
-  /* ---- bridge ---- */
+  /* The device's current voice is highlighted, nothing more. Read-only: with
+   * every control already on screen there is no page to switch, so the panel
+   * never has to tell the device anything about what it is showing. */
+  var focusNote = document.getElementById("focus-note");
+  function renderFocus(n) {
+    Object.keys(sectEls).forEach(function (i) {
+      sectEls[i].className = "sect" + (+i === n ? " on" : "");
+    });
+    focusNote.textContent = VOICES[n] ? ("MOVE IS ON " + VOICES[n].name.toUpperCase()) : "\u00a0";
+  }
+
+  function apply(k, raw) {
+    if (k === "ui_focus") { renderFocus(parseInt(raw, 10)); return; }
+    var v = parseInt(raw, 10);
+    if (isNaN(v)) return;
+    if (k === "mutes") { mutesMask = v; renderMutes(); return; }
+    state[k] = v;
+    if (widgets[k]) widgets[k].forEach(function (fn) { fn(v); });
+  }
+
   schwungRemote.onParamChange(function (params) {
     Object.keys(params).forEach(function (full) {
       if (full.indexOf("synth:") === 0) apply(full.substring(6), params[full]);
     });
   });
+
   function seed() {
     Object.keys(widgets).concat(["mutes", "ui_focus"]).forEach(function (k) {
-      schwungRemote.getParam(key(k)).then(function (v) { if (v !== undefined && v !== null && v !== "") apply(k, v); });
+      schwungRemote.getParam(key(k)).then(function (v) {
+        if (v !== undefined && v !== null && v !== "") apply(k, v);
+      });
     });
   }
-  /* Follow the device: the on-device editor writes synth:ui_focus (lane
-   * index) on every pad it follows; the manager pushes writes and also
-   * re-reads it on its periodic refresh. Handled in apply() so seed, refresh
-   * and live stream take the same path. */
-
-  /* mark the widgets that survive a page switch, then open the first voice */
-  persistentKeys = Object.keys(widgets);
-  selectLane(0, true);
-  setTimeout(seed, 400); setTimeout(seed, 1500);
+  setTimeout(seed, 400);
+  setTimeout(seed, 1500);
 })();
 </script>
 </body>

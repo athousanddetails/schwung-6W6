@@ -72,10 +72,14 @@ the signal path at all.
 
 ## Remote panel
 
-A TR-606-style panel in the browser — level knobs across the top, an
-INSTRUMENT selector and the selected drum's controls, with **REV** and **DLY**
-beside the eight voices for the two send buses. It follows the device: hit a
-pad on Move and the panel switches to that drum.
+A TR-606-style panel in the browser with **every control on screen at once** —
+the eight voices, both send buses and the master, plus the 606's own strip of
+level knobs across the top. Nothing to click through: the browser's advantage
+over the Move's eight-knob screen is space, so it uses it.
+
+It does not follow the device and does not need to — with nothing to switch,
+the two can never disagree. The voice you are editing on the Move is simply
+**highlighted**. Double-click any knob to reset it to its fitted default.
 
 Open port 7700 on whatever address the Move is on, then `/remote-ui`, while
 6W6 is the slot's synth — `move.local:7700` over WiFi, or `172.16.254.1:7700`
