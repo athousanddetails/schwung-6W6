@@ -43,8 +43,20 @@ def E(key, label, options, default=0):
 # CHARACTERS (two words -> first 3 of each; one word -> chars 0-3 / 3-6,
 # font5x3.mjs enumSquareLines). "Hard Clip" rendered HAR/CLI and "Wavefolder"
 # WAV/EFO; these read DIO/DE, CLI/P, FOL/D, CRU/SH. Order is storage order.
-DIST = ["Diode", "Clip", "Fold", "Crush"]
-def DRIVE(v):  return P(f"{v}_drive", "Drive", 0.2, 8.0, EXP, 55)   # pot 55 == 1.0
+DIST = ["Diode", "Clip", "SAT", "BFZ", "PDIST", "Fold", "Crush"]
+# Option text is sized for the stock grid's enum box: TWO LINES OF THREE
+# CHARACTERS (font5x3.mjs enumSquareLines) -- DIO/DE, CLI/P, SAT, BFZ, PDI/ST,
+# FOL/D, CRU/SH. "SAT"/"BFZ"/"PDIST" were named to fit; do not rename them.
+#
+# ORDER IS STORAGE ORDER, and it changed at state v2: Fold moved 2->5 and
+# Crush 3->6. sd606_deserialize remaps old blobs. Never reorder again without
+# extending that migration.
+# Drive: (0.85, 12) EXP, ported from 9W9. The old (0.2, 8) put unity at pot
+# 55, so the bottom 43% of the knob only ATTENUATED and distortion "only kinda
+# kicked in around 53". This range starts transparent (pot 8 == 1.0043) and
+# climbs immediately. Changing it changes what every STORED pot position
+# means, which is why state v2 re-solves them -- see sd606_deserialize.
+def DRIVE(v):  return P(f"{v}_drive", "Drive", 0.85, 12.0, EXP, 8)   # pot 8 ~= 1.0
 def DTYPE(v):  return E(f"{v}_dist_type", "Distortion", DIST)
 def LEVEL(v):  return P(f"{v}_level", "Level", 0.0, 2.0, LIN, 64)   # pot 64 == 1.0
 # Pitch RATIO pots: 0.5..2.0 exponential puts unity dead centre at pot 64.
@@ -114,7 +126,7 @@ PAGES = [
 
 GLOBALS = [
     E("master_dist", "Master Dist", ["Off"] + DIST),
-    P("master_drive", "Master Drive", 0.2, 8.0, EXP, 55),
+    P("master_drive", "Master Drive", 0.85, 12.0, EXP, 8),   # same range as the voices
     # 0.63 at centre-ish, not 0.8: a dense accented pattern peaks around
     # -1.1 dBFS from here, so the kit leaves real headroom for whatever
     # the chain puts after it instead of arriving already clipped.

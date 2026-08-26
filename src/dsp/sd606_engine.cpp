@@ -24,7 +24,11 @@
 
 using namespace SynthDrums606;
 
-#define SD606_STATE_VERSION 1
+/* 2: the drive pots changed range (0.2,8)->(0.85,12) and the distortion enums
+ * grew 4->7 / 5->8 with Fold and Crush moving. Both silently change what a
+ * STORED value means -- the blob is positional and stores raw pot positions --
+ * so v1 blobs are migrated on load. See migrate_v1(). */
+#define SD606_STATE_VERSION 2
 
 /* A choke is a 2 ms fade, not a hard stop — cutting a ringing open hat dead
  * puts a click on the front of the closed hat that follows it. */
@@ -72,6 +76,10 @@ struct VoiceRt {
     float hit_gain;      /* this hit's accent scale        */
     float choke_gain;    /* 1.0 normally, ramps to 0 on a choke */
     float choke_step;    /* < 0 while choking, else 0      */
+    /* Crush decimator: held sample + phase. Only distortion type 6 touches
+     * it. Reset on trigger, so a hit never inherits the previous one's held
+     * sample. */
+    float crush_st[2];
 };
 
 int find_pot(const char *key)
@@ -118,6 +126,7 @@ struct sd606_engine {
     int e_master_dist, e_choke, e_note_map;
     int p_master_drive, p_volume, p_accent;
 
+    float crush_master[2];           /* master-stage crush decimator */
     unsigned mutes;
     unsigned rng;                    /* per-hit kick drift */
 
@@ -232,6 +241,8 @@ void sd606_trigger(sd606_engine_t *e, int voice, int velocity)
     e->rt[voice].hit_gain   = accent;
     e->rt[voice].choke_gain = 1.0f;
     e->rt[voice].choke_step = 0.0f;
+    e->rt[voice].crush_st[0] = 0.0f;
+    e->rt[voice].crush_st[1] = 0.0f;
 
     const VoiceSlots &s = e->slot[voice];
     const float decay = e->potv[s.decay];
@@ -281,7 +292,8 @@ static inline float voice_sample(sd606_engine *e, int v, float raw)
     if(r.choke_gain <= 0.0f) return 0.0f;
 
     const VoiceSlots &s = e->slot[v];
-    const float shaped = sd606_shape(raw, e->potv[s.drive], e->env[s.dist]);
+    const float shaped = sd606_shape_st(raw, e->potv[s.drive], e->env[s.dist],
+                                        r.crush_st);
     return shaped * e->potv[s.level] * kVoiceTrim[v] * r.hit_gain * r.choke_gain;
 }
 
@@ -311,7 +323,7 @@ void sd606_render(sd606_engine_t *e, float *out, int frames)
         SD606_LANE(SD606_CP, e->cp.process());
 
         /* Master stage. Option 0 is Off, so the kit can be left alone. */
-        if(mdist > 0) mix = sd606_shape(mix, mdrive, mdist - 1);
+        if(mdist > 0) mix = sd606_shape_st(mix, mdrive, mdist - 1, e->crush_master);
         mix *= vol;
 
         if(!(mix > -8.0f && mix < 8.0f)) mix = 0.0f;   /* also catches NaN */
@@ -393,9 +405,66 @@ static const char *scan_ints(const char *p, int *dst, int max, int *got)
     return end ? end + 1 : NULL;
 }
 
+/* ---- v1 -> v2 migration -------------------------------------------------
+ *
+ * v1 stored drive as a position on a (0.2, 8) EXP pot and the distortion type
+ * as an index into a 4-option list (Diode, Clip, Fold, Crush). v2 uses a
+ * (0.85, 12) pot and a 7-option list with Fold and Crush moved to the end.
+ * Loading a v1 blob without this would quietly retune every drive knob and
+ * turn every saved Fold into SAT and every Crush into BFZ.
+ *
+ * Drive is converted through the ENGINEERING VALUE, not the position: recover
+ * what the old pot meant, then re-solve for the position that means the same
+ * thing now. Old positions below ~52 were attenuating settings the new range
+ * cannot express at all; they clamp to 0, which matches 9W9.
+ */
+static void migrate_v1(sd606_engine_t *e)
+{
+    for(int i = 0; i < SD606_NUM_POTS; ++i)
+    {
+        const char *k = g_sd606_pots[i].key;
+        const size_t n = strlen(k);
+        const int is_drive = (n >= 6 && !strcmp(k + n - 6, "_drive")) ||
+                             !strcmp(k, "master_drive");
+        if(!is_drive) continue;
+        const float old_val = 0.2f * powf(8.0f / 0.2f, (float)e->pot[i] / 127.0f);
+        float p = 127.0f * logf(old_val / 0.85f) / logf(12.0f / 0.85f);
+        if(p < 0.0f)   p = 0.0f;
+        if(p > 127.0f) p = 127.0f;
+        e->pot[i]  = (int)(p + 0.5f);
+        e->potv[i] = pot_value(i, e->pot[i]);
+    }
+    /* 0 Diode, 1 Clip stay put; Fold 2->5, Crush 3->6. master_dist carries a
+     * leading "Off", so its indices shift by one: 3->6, 4->7. */
+    static const int kVoiceRemap[4]  = { 0, 1, 5, 6 };
+    static const int kMasterRemap[5] = { 0, 1, 2, 6, 7 };
+    for(int i = 0; i < SD606_NUM_ENUMS; ++i)
+    {
+        const char *k = g_sd606_enums[i].key;
+        const size_t n = strlen(k);
+        if(n >= 10 && !strcmp(k + n - 10, "_dist_type"))
+        {
+            if(e->env[i] >= 0 && e->env[i] < 4) e->env[i] = kVoiceRemap[e->env[i]];
+        }
+        else if(!strcmp(k, "master_dist"))
+        {
+            if(e->env[i] >= 0 && e->env[i] < 5) e->env[i] = kMasterRemap[e->env[i]];
+        }
+    }
+}
+
 void sd606_deserialize(sd606_engine_t *e, const char *json)
 {
     if(!json || !*json) return;
+
+    /* The version was written from the start but never read. It is read now,
+     * because v2 needs it. A blob with no "v" at all predates nothing we
+     * shipped, but treat it as v1: that is the conservative reading. */
+    int version = 1;
+    {
+        const char *vp = strstr(json, "\"v\"");
+        if(vp) { vp = strchr(vp, ':'); if(vp) version = (int)strtol(vp + 1, NULL, 10); }
+    }
     const char *p = strstr(json, "\"pots\"");
     int vals[SD606_NUM_POTS > SD606_NUM_ENUMS ? SD606_NUM_POTS : SD606_NUM_ENUMS];
     int got = 0;
@@ -416,6 +485,8 @@ void sd606_deserialize(sd606_engine_t *e, const char *json)
         if(v >= g_sd606_enums[i].count) v = g_sd606_enums[i].count - 1;
         e->env[i] = v;
     }
+
+    if(version < 2) migrate_v1(e);
 
     const char *mp = strstr(json, "\"mutes\"");
     if(mp) { mp = strchr(mp, ':'); if(mp) e->mutes = (unsigned)strtoul(mp + 1, NULL, 10)

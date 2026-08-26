@@ -46,6 +46,19 @@ static double render_peak(int blocks)
     return (double)peak / 32767.0;
 }
 
+/* Peak is too blunt to tell distortion types apart -- Diode and Fold land
+ * within 0.0008 of each other on a kick. Hash the rendered samples instead. */
+static unsigned render_hash(int blocks)
+{
+    unsigned h = 2166136261u;
+    for(int b = 0; b < blocks; ++b)
+    {
+        api->render_block(inst, block, 128);
+        for(int i = 0; i < 128 * 2; ++i) h = (h ^ (unsigned)(unsigned short)block[i]) * 16777619u;
+    }
+    return h;
+}
+
 static void note_on(int note, int vel)
 {
     const uint8_t msg[3] = { 0x90, (uint8_t)note, (uint8_t)vel };
@@ -88,7 +101,8 @@ int main(int argc, char **argv)
     printf("      chain_params = %d bytes\n", n);
     CHECK(strstr(buf, "\"hh_choke\"") != NULL, "chain_params advertises hh_choke");
     CHECK(strstr(buf, "\"master_dist\"") != NULL, "chain_params advertises master_dist");
-    CHECK(strstr(buf, "\"Crush\"") != NULL, "master distortion offers Crush");
+    CHECK(strstr(buf, "\"Crush\"") != NULL && strstr(buf, "\"PDIST\"") != NULL,
+          "master distortion offers all seven types (Crush, PDIST present)");
 
     CHECK(api->get_param(inst, "ui_hierarchy", buf, sizeof(buf)) < 0,
           "ui_hierarchy absent (so ui_chain.js engages)");
@@ -318,6 +332,86 @@ int main(int argc, char **argv)
         api->get_param(inst, "seq_bd", buf, sizeof(buf));
         CHECK(atoi(buf) == 33825, "state restores the bd sequencer lane");
     }
+    /*
+     * ---- v1 -> v2 state migration ----
+     * Saved patches store raw pot POSITIONS and enum INDICES. v2 changed the
+     * drive pot's range and moved Fold/Crush down the distortion list, so a
+     * v1 blob loaded verbatim would retune every drive knob and turn every
+     * saved Fold into SAT. Build a v1 blob by serialising known values and
+     * relabelling the version, then check what comes back.
+     */
+    {
+        static char v1[8192];
+        api->set_param(inst, "bd_drive", "55");        /* v1 unity */
+        api->set_param(inst, "sd_drive", "0");         /* v1 far below unity */
+        api->set_param(inst, "master_drive", "55");
+        api->set_param(inst, "bd_dist_type", "2");     /* v1 Fold */
+        api->set_param(inst, "sd_dist_type", "3");     /* v1 Crush */
+        api->set_param(inst, "master_dist", "3");      /* v1 Fold */
+        n = api->get_param(inst, "state", v1, sizeof(v1));
+        CHECK(n > 20 && strstr(v1, "\"v\":2") != NULL, "fresh blobs are written as v2");
+        {   /* relabel it as the old version */
+            char *v = strstr(v1, "\"v\":2");
+            if(v) v[4] = '1';
+        }
+        api->set_param(inst, "state", v1);
+
+        api->get_param(inst, "bd_drive", buf, sizeof(buf));
+        CHECK(atoi(buf) == 7, "v1 drive pot 55 (unity) migrates to pot 7 — same drive, new range");
+        api->get_param(inst, "sd_drive", buf, sizeof(buf));
+        CHECK(atoi(buf) == 0, "v1 drive pot 0 clamps to 0 (the new range cannot attenuate)");
+        api->get_param(inst, "master_drive", buf, sizeof(buf));
+        CHECK(atoi(buf) == 7, "master_drive migrates the same way");
+        api->get_param(inst, "bd_dist_type", buf, sizeof(buf));
+        CHECK(atoi(buf) == 5, "v1 Fold (2) migrates to the new Fold (5)");
+        api->get_param(inst, "sd_dist_type", buf, sizeof(buf));
+        CHECK(atoi(buf) == 6, "v1 Crush (3) migrates to the new Crush (6)");
+        api->get_param(inst, "master_dist", buf, sizeof(buf));
+        CHECK(atoi(buf) == 6, "v1 master Fold (3) migrates to 6");
+
+        /* and a v2 blob must pass through untouched */
+        api->set_param(inst, "bd_drive", "40");
+        api->set_param(inst, "bd_dist_type", "3");
+        n = api->get_param(inst, "state", v1, sizeof(v1));
+        api->set_param(inst, "bd_drive", "0");
+        api->set_param(inst, "state", v1);
+        api->get_param(inst, "bd_drive", buf, sizeof(buf));
+        CHECK(atoi(buf) == 40, "a v2 blob is NOT migrated (drive stays 40)");
+        api->get_param(inst, "bd_dist_type", buf, sizeof(buf));
+        CHECK(atoi(buf) == 3, "a v2 blob's distortion type is left alone");
+        api->set_param(inst, "bd_drive", "8");
+        api->set_param(inst, "sd_drive", "8");
+        api->set_param(inst, "master_drive", "8");
+        api->set_param(inst, "bd_dist_type", "0");
+        api->set_param(inst, "sd_dist_type", "0");
+        api->set_param(inst, "master_dist", "0");
+    }
+
+    /* the seven distortion types must all be reachable and audibly distinct */
+    {
+        /* the state round-trip above left mutes at 5 -- bit 0 is the bass drum,
+         * and a muted lane renders silence, which is identical for every
+         * distortion type. Clear it, or this measures nothing. */
+        api->set_param(inst, "mutes", "0");
+        api->set_param(inst, "bd_drive", "100");
+        unsigned sig[7]; int distinct = 1;
+        for(int t = 0; t < 7; ++t)
+        {
+            char v[8]; snprintf(v, sizeof v, "%d", t);
+            render_peak(600);                      /* let the tail die */
+            api->set_param(inst, "bd_dist_type", v);
+            note_on(68, 90);
+            sig[t] = render_hash(200);
+        }
+        for(int a = 0; a < 7 && distinct; ++a)
+            for(int b2 = a + 1; b2 < 7; ++b2)
+                if(sig[a] == sig[b2]) { distinct = 0; break; }
+        CHECK(distinct, "all 7 distortion types produce pairwise-different output");
+        api->set_param(inst, "bd_dist_type", "0");
+        api->set_param(inst, "bd_drive", "8");
+        render_peak(600);
+    }
+
     /* A blob shorter than the current pot table is a patch saved before a
      * control was added. The contract is that the missing tail is left as it
      * is — not reset, and above all not read off the end of the array. */
