@@ -67,6 +67,9 @@ the signal path at all.
 - **Sequencing:** use Move's own sequencer — a drum track with a kit, muted
   (HiJack), track MIDI OUT on the slot's channel. Each drum is its own lane.
   Note map: drum rack (36–43, default) or General MIDI, switchable.
+- **Saved patches from 1.0.0 still load.** Drive changed range and the
+  distortion list grew, so stored positions are converted on load rather than
+  reinterpreted.
 - Works with [Movy](https://github.com/DimaDake/schwung-movy) — a
   `movy_config.json` ships with the module.
 

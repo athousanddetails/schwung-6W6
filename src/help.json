@@ -5,17 +5,19 @@
       "title": "Overview",
       "lines": [
         "TR-606 style drum",
-        "machine. Every",
-        "voice synthesized,",
-        "no samples - kick,",
+        "machine. Every voice",
+        "synthesized, no",
+        "samples - kick,",
         "snare, toms, hats,",
         "cymbal, plus a clap.",
         "Fitted to a real 606.",
         "",
-        "Reverb and delay",
-        "sends on every voice,",
-        "7 distortion types,",
-        "master glue Comp."
+        "Reverb + delay sends",
+        "on every voice.",
+        "7 distortion types",
+        "per voice and on the",
+        "master. Comp on the",
+        "master bus."
       ]
     },
     {
@@ -41,13 +43,37 @@
         "visible page.",
         "Jog: change page.",
         "Jog CLICK on Main:",
-        " lock the page so",
-        " pads stop moving",
-        " it ([L] in bar).",
+        " lock it, so pads",
+        " stop moving the",
+        " page ([L] in bar).",
+        "Shift: values + fine",
+        "Mute+knob: default",
         "",
-        "Every voice: Tune,",
-        "Decay, Drive, Dist,",
-        "Level, Rev, Dly."
+        "Delete or Copy held:",
+        " pads go straight to",
+        " Move, so you can",
+        " clear steps on any",
+        " pad, page pads too."
+      ]
+    },
+    {
+      "title": "Distortion",
+      "lines": [
+        "Drive + a type on",
+        "every voice, and",
+        "again on the master:",
+        " DIODE the machine's",
+        " CLIP  asymmetric",
+        " SAT   warm, parallel",
+        " BFZ   fuzz wall",
+        " PDIST cubic crunch",
+        " FOLD  wavefolder",
+        " CRUSH bits + rate",
+        "",
+        "Drive fully DOWN is",
+        "exactly dry - the",
+        "stage is not in the",
+        "path at all."
       ]
     },
     {
@@ -102,20 +128,22 @@
       "title": "Remote UI",
       "lines": [
         "Full panel in the",
-        "browser, on port",
-        "7700 of whatever",
-        "address the Move is",
-        "on:",
-        " move.local:7700",
-        " (WiFi, if mDNS",
-        "  is behaving)",
-        " 172.16.254.1:7700",
-        " (USB-C, always",
-        "  this address)",
-        "then /remote-ui.",
+        "browser: EVERY",
+        "control at once, all",
+        "8 voices plus the",
+        "buses and master.",
         "",
-        "The panel follows",
-        "the pad you hit."
+        "Port 7700 on the",
+        "Move's address, then",
+        " /remote-ui",
+        " move.local:7700",
+        " 172.16.254.1:7700",
+        "  (USB-C, always)",
+        "",
+        "The voice you are on",
+        "here is highlighted",
+        "there. Double-click",
+        "a knob to reset it."
       ]
     }
   ]
