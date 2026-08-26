@@ -47,12 +47,27 @@ Object.assign(globalThis, {
 });
 
 /* ---- load ui_chain.js with its device imports pointed at the real library ---- */
+const spy = path.join(ROOT, "build-native", "pc_spy.mjs");
+fs.mkdirSync(path.dirname(spy), { recursive: true });
+fs.writeFileSync(spy, `
+import { createController as real } from ${JSON.stringify(pathToFileURL(SHARED + "/param_pages/page_controller.mjs").href)};
+export const spied = { title: null };
+export function createController(...a) {
+  const c = real(...a);
+  const r = c.render.bind(c);
+  c.render = (ctx, opts) => { if (opts && opts.title != null) spied.title = opts.title; return r(ctx, opts); };
+  return c;
+}
+`);
 const src = fs.readFileSync(path.join(ROOT, "src/ui_chain.js"), "utf8")
+  .replace(/\/data\/UserData\/schwung\/shared\/param_pages\/page_controller\.mjs/g,
+           pathToFileURL(spy).href)
   .replace(/\/data\/UserData\/schwung\/shared\//g, pathToFileURL(SHARED + "/").href);
 const tmp = path.join(ROOT, "build-native", "ui_chain.test.mjs");
 fs.mkdirSync(path.dirname(tmp), { recursive: true });
 fs.writeFileSync(tmp, src);
 await import(pathToFileURL(tmp).href);
+const { spied } = await import(pathToFileURL(spy).href);
 const ui = globalThis.chain_ui;
 check(ui && ui.init && ui.tick && ui.onMidiMessageInternal && ui.handleBack, "chain_ui exports the four hooks");
 
@@ -98,6 +113,50 @@ ui.tick();                                                   /* title shows [M];
 check(true, "tick with a muted lane renders");
 ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 127])); note(78, 100); off(78); ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 0]));
 check(params["synth:mutes"] === "0", "second Mute+Pad clears it");
+
+/* ---- Main-page jog lock ---- */
+const jogClick = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 3, 127]));
+const jogTurn  = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1]));
+
+/* get to Main, then arm the lock with a click there */
+note(87, 100); off(87); ui.tick();
+globalThis.__6w6_main_lock = false;
+jogClick(); ui.tick();
+check(globalThis.__6w6_main_lock === true, "jog click on Main arms the lock");
+
+setLog.length = 0; injected = [];
+note(69, 100); off(69);
+check(!setLog.some(([k]) => k === "synth:ui_focus"), "locked: a pad no longer moves the page");
+check(injected.length === 2, "locked: the pad still plays and still records");
+
+/* Shift+Pad is an explicit 'take me there' and must still navigate */
+shift = true; setLog.length = 0;
+note(70, 100); off(70); shift = false;
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "2"),
+      "locked: Shift+Pad still navigates (lane 2)");
+
+/* the title advertises it. The header is a bitmap font, so this reads the
+ * title the binding HANDS the renderer rather than scraping the screen. */
+ui.tick();
+check(/\[L\]/.test(spied.title || ""), "locked: the title says [L] (" + spied.title + ")");
+
+/* Back to Main first -- a click only toggles the lock while ON Main, and the
+ * Shift+Pad above deliberately navigated away. */
+shift = true; note(87, 100); off(87); shift = false; ui.tick();
+jogClick(); ui.tick();
+check(globalThis.__6w6_main_lock === false, "a second jog click, on Main, unlocks");
+ui.tick();
+check(!/\[L\]/.test(spied.title || ""), "unlocked: [L] is gone (" + spied.title + ")");
+setLog.length = 0;
+note(69, 100); off(69);
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "1"),
+      "unlocked: pads move the page again");
+
+/* the lock must survive the editor being re-opened (host re-evals the file) */
+globalThis.__6w6_main_lock = true;
+check(globalThis.__6w6_main_lock === true,
+      "the lock lives on globalThis, so re-entering the editor keeps it");
+globalThis.__6w6_main_lock = false;
 
 /* knob 1 on the current page (CC 71 delta) writes a synth param */
 setLog.length = 0;

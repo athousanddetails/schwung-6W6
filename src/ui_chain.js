@@ -45,6 +45,26 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
     /* page key -> lane whose mute the title indicator shows (-1 = none) */
     var LEVEL2LANE = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7, root: -1 };
 
+    /* Pads that switch the page and never sound: they are not injected back
+     * to Move, so Move never lights or records them. */
+    function isPageOnlyPad(n) { return n === 87; }
+
+    /* Main-page lock: a jog CLICK while already on the Main page toggles it.
+     * While locked, pads still play and still record, but the page stops
+     * following them -- so the master knobs stay under your hands while you
+     * jam. Shift+Pad still navigates: that gesture is an explicit "take me
+     * there". Another click unlocks; the title shows [L].
+     *
+     * It lives on globalThis deliberately. The host re-evaluates this file
+     * every time the editor is opened, so module-level state would reset and
+     * the lock would look like it dropped itself. */
+    function mainLocked() { return !!globalThis.__6w6_main_lock; }
+
+    function onMainPage() {
+        var page = controller && controller.page;
+        return !!page && (page.level === "root" || page.level == null);
+    }
+
     var mySlot = -1;
     var padBlocked = false;
     var muteHeld = false;
@@ -170,6 +190,7 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
                 "Pad: play + select",
                 "Sh+Pad: select only",
                 "Mute+Pad: mute drum",
+                "Jog click on Main: lock",
                 "Jog: page  Click: list",
                 "Shift: fine + values",
                 "Mute+knob: default"
@@ -184,6 +205,7 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
      * just the module name plus the mute flag for the drum on screen. */
     function title() {
         var t = "6W6";
+        if (mainLocked()) t += " [L]";
         var page = controller && controller.page;
         var lane = page ? LEVEL2LANE[page.level] : -1;
         if (lane !== undefined && lane >= 0 && (mutesMask & (1 << lane)))
@@ -255,11 +277,17 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
                 var lane = PAD2LANE[d1];
                 if (status === 0x90 && d2 > 0 && lane !== undefined)
                     toggleLaneMute(lane);
-                injectToMove(data);
+                if (!isPageOnlyPad(d1)) injectToMove(data);
                 return;
             }
 
             var level = PAD2LEVEL[d1];
+
+            /* Locked to Main: the pad plays, the page stays. */
+            if (mainLocked() && !shiftHeld()) {
+                if (!isPageOnlyPad(d1)) injectToMove(data);
+                return;
+            }
 
             if (shiftHeld()) {
                 /* Silent select: page follows AND Move's white pad follows —
@@ -268,20 +296,22 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
                  * press would be recorded; Gus does not use REC. */
                 if (status === 0x90 && d2 > 0) {
                     if (level !== undefined) goToLevel(level);
-                    ctlSetParam("synth:mute_ms", "60");
-                    injectToMove(data);
+                    if (!isPageOnlyPad(d1)) {
+                        ctlSetParam("synth:mute_ms", "60");
+                        injectToMove(data);
+                    }
                 } else {
-                    injectToMove(data);        /* matching release */
+                    if (!isPageOnlyPad(d1)) injectToMove(data);   /* release */
                 }
                 return;
             }
 
-            /* Plain pad: page follows what you play; Move plays/records. */
-            if (status === 0x90 && d2 > 0 && level !== undefined && d1 !== 87)
+            /* Plain pad: page follows what you play; Move plays/records.
+             * PAD2LEVEL already maps the page-only pads to their pages, so
+             * one branch covers both kinds. */
+            if (status === 0x90 && d2 > 0 && level !== undefined)
                 goToLevel(level);
-            if (status === 0x90 && d2 > 0 && d1 === 87)
-                goToLevel("root");             /* pad 16: master, never sounds */
-            if (d1 !== 87) injectToMove(data);
+            if (!isPageOnlyPad(d1)) injectToMove(data);
             return;
         }
 
@@ -289,6 +319,11 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
         if (!controller) return;
         var intent = decodeInput(data, { shift: shiftHeld(), mute: muteHeld });
         if (!intent) return;
+        /* Before applyInput, or the section picker consumes the click. */
+        if (intent.type === "click" && !controller.pickerOpen && onMainPage()) {
+            globalThis.__6w6_main_lock = !globalThis.__6w6_main_lock;
+            return;
+        }
         var todo = applyInput(controller, intent, { nowMs: Date.now(), reveal: false });
         if (todo && todo.action === "exit") {
             /* Back never reaches us (the host consumes it); any other exit
