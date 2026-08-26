@@ -35,6 +35,20 @@ using namespace SynthDrums606;
  * has no such control. 76/127 of the old (0,1) pot. */
 #define SD606_SD_DECAY_FIXED 0.5984252f
 
+/*
+ * Drive at the bottom of the knob must be TRANSPARENT, and with a (0.85, 12)
+ * range it is not: pot 0 is drive 0.85, and diode rounding at 0.85 still
+ * shapes and still adds about +1.8 dB of small-signal gain. Widening the
+ * range cannot fix that -- even drive 1.0 is tanh(x)/tanh(1), not identity.
+ *
+ * So the bottom of the knob crossfades dry into the shaped signal instead:
+ * pot 0 is EXACTLY the dry sample (the shaper is not even called) and the
+ * blend reaches fully wet at pot 8, which is the default. Above 8 nothing
+ * changes at all -- that is deliberate, and it is what keeps the fitted kit
+ * bit-identical at its defaults.
+ */
+#define SD606_DRIVE_WET_POT 8
+
 /* A choke is a 2 ms fade, not a hard stop — cutting a ringing open hat dead
  * puts a click on the front of the closed hat that follows it. */
 static const float kChokeSeconds = 0.002f;
@@ -331,8 +345,18 @@ static inline float voice_sample(sd606_engine *e, int v, float raw)
     if(r.choke_gain <= 0.0f) return 0.0f;
 
     const VoiceSlots &s = e->slot[v];
-    const float shaped = sd606_shape_st(raw, e->potv[s.drive], e->env[s.dist],
-                                        r.crush_st);
+    const int dpot = e->pot[s.drive];
+    float shaped;
+    if(dpot <= 0)
+    {
+        shaped = raw;                       /* knob fully down: nothing at all */
+    }
+    else
+    {
+        shaped = sd606_shape_st(raw, e->potv[s.drive], e->env[s.dist], r.crush_st);
+        if(dpot < SD606_DRIVE_WET_POT)      /* fade the stage in over 0..8 */
+            shaped = raw + ((float)dpot / (float)SD606_DRIVE_WET_POT) * (shaped - raw);
+    }
     return shaped * e->potv[s.level] * kVoiceTrim[v] * r.hit_gain * r.choke_gain;
 }
 
@@ -353,6 +377,7 @@ void sd606_render(sd606_engine_t *e, float *out, int frames)
 {
     const int   mdist  = e->env[e->e_master_dist];
     const float mdrive = e->potv[e->p_master_drive];
+    const int   mpot   = e->pot[e->p_master_drive];
     const float vol    = e->potv[e->p_volume];
     const float comp   = e->potv[e->p_comp];
 
@@ -381,7 +406,13 @@ void sd606_render(sd606_engine_t *e, float *out, int frames)
         mix += sd606_dly_tick(&e->dly, send_d, e->sample_rate);
 
         /* Master stage. Option 0 is Off, so the kit can be left alone. */
-        if(mdist > 0) mix = sd606_shape_st(mix, mdrive, mdist - 1, e->crush_master);
+        if(mdist > 0 && mpot > 0)
+        {
+            float shaped = sd606_shape_st(mix, mdrive, mdist - 1, e->crush_master);
+            if(mpot < SD606_DRIVE_WET_POT)
+                shaped = mix + ((float)mpot / (float)SD606_DRIVE_WET_POT) * (shaped - mix);
+            mix = shaped;
+        }
         /* Glue after the distortion, before the volume -- and skipped
          * entirely at zero, which is the default, so it cannot colour a kit
          * nobody asked it to touch. */

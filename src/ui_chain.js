@@ -81,6 +81,7 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
     var mySlot = -1;
     var padBlocked = false;
     var muteHeld = false;
+    var editHeld = false;   /* Move's Delete or Copy held */
     var mutesMask = 0;
     var controller = null;
 
@@ -278,9 +279,32 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
             return;
         }
 
+        /* Delete (CC 119) and Copy (CC 60) are MOVE's gestures, not ours.
+         * While either is held we get out of the way entirely -- see the pad
+         * branch below. */
+        if (status === 0xB0 && (d1 === 119 || d1 === 60)) {
+            editHeld = (d2 > 0);
+            injectToMove(data);
+            return;
+        }
+
         /* ---- Pads: 6W6's own layer ---- */
         if ((status === 0x90 || status === 0x80 || status === 0xA0) &&
             d1 >= 68 && d1 <= 99) {
+
+            /*
+             * Move's own pad gestures win. Delete+Pad and Copy+Pad address
+             * Move's CLIP, not our kit, and our page-only pads (Master,
+             * Reverb, Delay) are normally swallowed -- which left steps
+             * recorded on those pads by another module impossible to select
+             * or delete, because the press never reached Move. While Delete
+             * or Copy is held, every pad passes straight through untouched:
+             * no page follow, no mute toggle, no silent-select window.
+             */
+            if (editHeld) {
+                injectToMove(data);
+                return;
+            }
 
             if (status === 0x90 && d2 > 0) dismissHint();
 

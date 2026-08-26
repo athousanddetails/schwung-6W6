@@ -145,6 +145,51 @@ int main(void)
         CHECK(e_lo[1] < e_lo[0] * 0.5, msg);
     }
 
+    /* ---- Drive fully down is EXACTLY dry, for every distortion type ----
+     * The range alone cannot deliver that: pot 0 is drive 0.85, and diode
+     * rounding at 0.85 still shapes and still adds about +1.8 dB. The bottom
+     * of the knob crossfades dry->wet instead, reaching fully wet at pot 8.
+     *
+     * This needs a FRESH engine per case: the voices carry free-running
+     * noise, so the same hit rendered later never matches itself, and the
+     * loadtest -- one long-lived instance -- cannot test this at all. */
+    {
+        unsigned ref = 0; int alldry = 1;
+        for(int t = 0; t < 7; ++t)
+        {
+            sd606_engine_t *e = sd606_create(44100.0f);
+            set(e, "volume", "127"); set(e, "master_dist", "0");
+            set(e, "bd_drive", "0");
+            char v[8]; snprintf(v, sizeof v, "%d", t);
+            set(e, "bd_dist_type", v);
+            sd606_trigger(e, SD606_BD, 110);
+            std::vector<float> o = render(e, 1.0);
+            sd606_destroy(e);
+            unsigned h = 2166136261u;
+            for(float x : o) { union { float f; unsigned u; } z; z.f = x; h = (h ^ z.u) * 16777619u; }
+            if(t == 0) ref = h; else if(h != ref) alldry = 0;
+        }
+        CHECK(alldry, "Drive at 0 is bit-exactly dry for all 7 distortion types");
+
+        /* and no step where the crossfade hands over to the shaper */
+        double lvl[3]; const char *pots[3] = { "6", "8", "10" };
+        for(int i = 0; i < 3; ++i)
+        {
+            sd606_engine_t *e = sd606_create(44100.0f);
+            set(e, "volume", "127"); set(e, "master_dist", "0");
+            set(e, "bd_drive", pots[i]); set(e, "bd_dist_type", "0");
+            sd606_trigger(e, SD606_BD, 110);
+            std::vector<float> o = render(e, 1.0);
+            sd606_destroy(e);
+            double a2 = 0; for(float x : o) a2 += x * x;
+            lvl[i] = sqrt(a2 / o.size());
+        }
+        const double d1 = 20 * log10(lvl[1] / lvl[0]), d2 = 20 * log10(lvl[2] / lvl[1]);
+        snprintf(msg, sizeof msg,
+                 "no jump where the fade hands over (pot 6->8 %+.2f dB, 8->10 %+.2f dB)", d1, d2);
+        CHECK(fabs(d1) < 1.0 && fabs(d2) < 1.0, msg);
+    }
+
     printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASS", fails,
            fails == 1 ? "" : "s");
     return fails ? 1 : 0;

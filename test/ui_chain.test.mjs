@@ -120,6 +120,25 @@ check(true, "tick with a muted lane renders");
 ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 127])); note(78, 100); off(78); ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 0]));
 check(params["synth:mutes"] === "0", "second Mute+Pad clears it");
 
+/* ---- Move's own gestures win: Delete/Copy + Pad ----
+ * Steps recorded on a page-only pad by another module were impossible to
+ * select or delete, because our layer swallowed the press before Move saw it. */
+const hold = (cc, on) => ui.onMidiMessageInternal(new Uint8Array([0xB0, cc, on ? 127 : 0]));
+for (const [cc, name] of [[119, "Delete"], [60, "Copy"]]) {
+  hold(cc, true);
+  setLog.length = 0; injected = [];
+  note(84, 100); off(84);                 /* the Master pad: normally swallowed */
+  check(injected.length === 2, name + "+Pad: a page-only pad DOES reach Move");
+  check(!setLog.some(([k]) => k === "synth:ui_focus"), name + "+Pad: and does not change our page");
+  setLog.length = 0; injected = [];
+  note(69, 100); off(69);                 /* a normal voice pad */
+  check(injected.length === 2 && setLog.length === 0, name + "+Pad: voice pads pass through untouched");
+  hold(cc, false);
+}
+setLog.length = 0; injected = [];
+note(84, 100); off(84);
+check(injected.length === 0, "with Delete released, the Master pad is swallowed again");
+
 /* ---- Main-page jog lock ---- */
 const jogClick = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 3, 127]));
 const jogTurn  = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1]));
