@@ -84,7 +84,6 @@ PAGES = [
         P("bd_tune",    "Tune",    -9.78, 14.22, LIN, 40),
         DECAY("bd", 24),
         P("bd_attack",  "Attack",   0.0,  1.0,  LIN, 120),  # transient amount
-        P("bd_drift",   "Drift",    0.0,  1.0,  LIN, 0),    # per-hit pitch variation
         DRIVE("bd"), DTYPE("bd"), LEVEL("bd"),
     ]),
     ("sd", "Snare", [
@@ -92,7 +91,6 @@ PAGES = [
         # Defaults FITTED against the hardware snare (1680 renders, score
         # 11.3 -> 8.4): a touch sharper, shorter, less wire, darker wire.
         P("sd_tune",    "Tune",     0.5,  2.0,  EXP, 70),
-        DECAY("sd", 76),
         P("sd_snappy",  "Snappy",   0.0,  1.0,  LIN, 64),   # wire level only
         P("sd_tone",    "Tone",     0.5,  2.0,  EXP, 52),   # noise colour ratio
         DRIVE("sd"), DTYPE("sd"), LEVEL("sd"),
@@ -124,6 +122,33 @@ PAGES = [
     ]),
 ]
 
+# Send amounts, one pair per voice. Post-fader, 0 by default -- and that
+# default is load-bearing: at zero the FX ticks see exactly 0.0 and return
+# exactly 0.0, so the kit is bit-identical to one with no FX at all.
+def SENDS(v): return [P(f"{v}_rev", "Rev", 0.0, 1.0, LIN, 0),
+                      P(f"{v}_dly", "Dly", 0.0, 1.0, LIN, 0)]
+
+# Tempo-synced delay: Time is a note DIVISION, not milliseconds, so it is an
+# enum. Order must match kSd606DlyBeats in sd606_fx.h.
+DIVS = ["1/32", "1/16T", "1/16", "1/8T", "1/16.", "1/8", "1/4T", "1/8.",
+        "1/4", "1/2T", "1/4.", "1/2", "1/2."]
+
+FX_PAGES = [
+    ("rev", "Reverb", [
+        P("rev_decay", "Decay",  0.2,  0.93, LIN, 73),      # 0.62
+        P("rev_tone",  "Tone",   0.0,  1.0,  LIN, 57),      # 0.45
+        P("rev_hpf",   "HPF",   30.0, 800.0, EXP, 62),      # 150 Hz
+        P("rev_level", "Level",  0.0,  1.2,  LIN, 85),      # 0.80
+    ]),
+    ("dly", "Delay", [
+        E("dly_time",  "Time", DIVS, 7),                    # dotted eighth
+        P("dly_fdbk",  "Fdbk",   0.0,  0.85, LIN, 52),      # 0.35
+        P("dly_tone",  "Tone",   0.0,  1.0,  LIN, 51),      # 0.40
+        P("dly_hpf",   "HPF",   30.0, 800.0, EXP, 62),      # 150 Hz
+        P("dly_level", "Level",  0.0,  1.2,  LIN, 85),      # 0.80
+    ]),
+]
+
 GLOBALS = [
     E("master_dist", "Master Dist", ["Off"] + DIST),
     P("master_drive", "Master Drive", 0.85, 12.0, EXP, 8),   # same range as the voices
@@ -132,6 +157,10 @@ GLOBALS = [
     # the chain puts after it instead of arriving already clipped.
     P("volume", "Volume", 0.0, 1.0, LIN, 76),
     P("accent", "Accent", 1.0, 4.0, LIN, 42),               # 2.0x on accented hits
+    # One-knob bus glue, ported from 9W9. NOT 606 circuitry and honest about
+    # it: at zero the stage is not in the path at all (bit-identical), and the
+    # knob blends threshold, ratio and auto-makeup together.
+    P("comp", "Comp", 0.0, 1.0, LIN, 0),
     E("hh_choke", "Choke", ["Off", "CH>OH", "Mutual"], 1),   # CH>/OH in the box
     E("note_map", "Note Map", ["Rack 36", "GM"]),            # RAC/36 in the box
 ]
@@ -177,28 +206,61 @@ def register(p):
     else:
         enums.append(p)
 
-for pid, label, params in PAGES:
+# THE POT AND ENUM TABLES ARE POSITIONAL STORAGE. The state blob holds raw
+# values by index, so a key may be APPENDED but never inserted or reordered.
+# That is why registration below is deliberately not in page order: every
+# parameter that existed before the send FX is registered first, in exactly
+# its old order, and the new sends and FX params go on the end. Pages may then
+# list them in whatever order reads well.
+PAGE_SENDS = {pid: SENDS(pid) for pid, _, _ in PAGES}
+
+# Controls the real machine does not have, and which are therefore GONE, not
+# hidden: the 606's kick has no per-hit pitch variation (bd_drift had always
+# defaulted to 0, so no sound changes -- only the ability to turn it on) and
+# its snare has no decay control at all. The snare's decay is pinned at the
+# value fitted against the hardware; see SD606_SD_DECAY_FIXED.
+#
+# Deleting them RENUMBERS the positional pot table, which is why v1 blobs are
+# migrated BY NAME rather than by index -- see kV1PotKeys in sd606_engine.cpp.
+
+for pid, label, params in PAGES:          # 1. the original per-voice params
     for p in params:
         register(p)
-    if len(params) > 8:
-        raise SystemExit(f"page {pid} has {len(params)} params — max 8 knobs")
+for p in GLOBALS:                         # 2. the original globals
+    register(p)
+for pid, _, _ in PAGES:                   # 3. NEW: the send pots
+    for p in PAGE_SENDS[pid]:
+        register(p)
+for _, _, params in FX_PAGES:             # 4. NEW: the FX params
+    for p in params:
+        register(p)
+
+# Now the pages, which may reference anything registered above.
+for pid, label, params in PAGES:
+    full = params + PAGE_SENDS[pid]
+    if len(full) > 8:
+        raise SystemExit(f"page {pid} has {len(full)} params -- max 8 knobs")
+    levels[pid] = {"name": label,
+                   "knobs": [p["key"] for p in full],
+                   "params": [{"key": p["key"], "name": p["name"]} for p in full]}
+    root.append({"level": pid, "label": label})
+
+for pid, label, params in FX_PAGES:
     levels[pid] = {"name": label,
                    "knobs": [p["key"] for p in params],
                    "params": [{"key": p["key"], "name": p["name"]} for p in params]}
     root.append({"level": pid, "label": label})
 
-for p in GLOBALS:
-    register(p)
 root += [{"key": p["key"], "name": p["name"]} for p in GLOBALS]
 levels["root"] = {"name": "6W6",
-                  "knobs": [p["key"] for p in GLOBALS[:4]],
+                  "knobs": ["master_dist", "master_drive", "comp", "volume", "accent"],
                   "params": root}
 
 # Two plugin-level keys that live on NO page but must be in chain_params: the
 # remote-UI manager seeds and periodically re-reads exactly the keys listed
 # here, and a key it does not know about never reaches the browser. ui_focus
 # is the lane the on-device editor is showing (0-7, 8 = master); mutes is the
-# per-lane mute mask. Both are written by ui_chain.js and served by the plugin.
+# per-lane mute mask. Both are served by the plugin, not the pot table.
 cp.append({"key": "ui_focus", "name": "Focus", "type": "int", "min": 0, "max": 8, "default": 0})
 cp.append({"key": "mutes", "name": "Mutes", "type": "int", "min": 0, "max": 255, "default": 0})
 
@@ -272,12 +334,13 @@ static const char sd606_ui_pages_json[] =
 # HARD RULE (cost a debugging session on Tablor): a Movy bank is EXACTLY ONE
 # PAGE. buildConfigPages keys bankGroups per BANK but the UI indexes per PAGE,
 # so a multi-row bank shifts every following page's label. One row per bank.
-SHORT = {"Tune": "TUNE", "Decay": "DECAY", "Attack": "ATTK", "Drift": "DRIFT",
+SHORT = {"Comp": "COMP", "Rev": "REV", "Dly": "DLY", "Fdbk": "FDBK", "HPF": "HPF", "Time": "TIME",
+         "Tune": "TUNE", "Decay": "DECAY", "Attack": "ATTK", "Drift": "DRIFT",
          "Drive": "DRIVE", "Distortion": "DIST", "Level": "LEVEL",
          "Snappy": "SNAPY", "Tone": "TONE", "Noise": "NOISE", "Choke": "CHOKE",
          "Master Dist": "MDIST", "Master Drive": "MDRV", "Volume": "VOL",
          "Accent": "ACNT", "Note Map": "NMAP"}
-MOVY_NAME = {"bd": "Kick", "sd": "Snare", "lt": "Lo Tom", "ht": "Hi Tom",
+MOVY_NAME = {"rev": "Reverb", "dly": "Delay", "bd": "Kick", "sd": "Snare", "lt": "Lo Tom", "ht": "Hi Tom",
              "ch": "Cl Hat", "oh": "Op Hat", "cy": "Cymbal", "cp": "Clap"}
 def movy_slot(p):
     d = {"key": p["key"], "short": SHORT[p["name"]], "full": p["name"]}
@@ -290,8 +353,12 @@ def movy_slot(p):
     return d
 banks = []
 for pid, label, params in PAGES:
-    row = [movy_slot(p) for p in params] + [None] * (8 - len(params))
+    full = params + PAGE_SENDS[pid]
+    row = [movy_slot(p) for p in full] + [None] * (8 - len(full))
     banks.append({"name": MOVY_NAME[pid], "rows": [row]})
+for pid, label, params in FX_PAGES:
+    row = [movy_slot(p) for p in params] + [None] * (8 - len(params))
+    banks.append({"name": label, "rows": [row]})
 banks.append({"name": "Master", "global": True,
               "rows": [[movy_slot(p) for p in GLOBALS] + [None] * (8 - len(GLOBALS))]})
 movy = {"id": "6w6", "name": "6W6",

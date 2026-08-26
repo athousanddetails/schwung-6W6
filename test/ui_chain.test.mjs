@@ -92,9 +92,15 @@ setLog.length = 0; note(69, 100); off(69);
 check(setLog.length === 1 && setLog[0][1] === "1", "moving to another pad does write (lane 1)");
 
 /* pad 16 = master page: never reaches Move */
-injected = []; setLog.length = 0; note(87, 100); off(87);
-check(injected.length === 0, "pad 16 (master) never sounds");
-check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "8"), "pad 16 publishes ui_focus=8 (master)");
+injected = []; setLog.length = 0; note(84, 100); off(84);
+check(injected.length === 0, "pad 9 (master) never sounds");
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "8"), "pad 9 publishes ui_focus=8 (master)");
+injected = []; setLog.length = 0; note(85, 100); off(85);
+check(injected.length === 0, "pad 10 (reverb) never sounds");
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "9"), "pad 10 opens Reverb (focus 9)");
+injected = []; setLog.length = 0; note(86, 100); off(86);
+check(injected.length === 0, "pad 11 (delay) never sounds");
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "10"), "pad 11 opens Delay (focus 10)");
 
 /* Shift+Pad: silent select -> mute_ms 60 then inject */
 shift = true; injected = []; setLog.length = 0;
@@ -119,7 +125,7 @@ const jogClick = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 3, 127]));
 const jogTurn  = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1]));
 
 /* get to Main, then arm the lock with a click there */
-note(87, 100); off(87); ui.tick();
+note(84, 100); off(84); ui.tick();
 globalThis.__6w6_main_lock = false;
 jogClick(); ui.tick();
 check(globalThis.__6w6_main_lock === true, "jog click on Main arms the lock");
@@ -142,7 +148,7 @@ check(/\[L\]/.test(spied.title || ""), "locked: the title says [L] (" + spied.ti
 
 /* Back to Main first -- a click only toggles the lock while ON Main, and the
  * Shift+Pad above deliberately navigated away. */
-shift = true; note(87, 100); off(87); shift = false; ui.tick();
+shift = true; note(84, 100); off(84); shift = false; ui.tick();
 jogClick(); ui.tick();
 check(globalThis.__6w6_main_lock === false, "a second jog click, on Main, unlocks");
 ui.tick();

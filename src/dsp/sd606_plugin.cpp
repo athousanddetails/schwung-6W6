@@ -53,6 +53,7 @@ typedef struct {
     uint64_t        samples_rendered;
     uint64_t        mute_until;
     int             mute_one;
+    float           last_bpm;
 
     /* Lane the on-device editor is showing (0-7, "8" = master). The
      * editor WRITES it on every pad-follow; the remote panel reads it back
@@ -374,6 +375,21 @@ static void render_block(void *_instance, int16_t *_out_lr, const int _frames)
     if(!inst) { memset(_out_lr, 0, (size_t)_frames * 2 * sizeof(int16_t)); return; }
 
     inst->samples_rendered += (uint64_t)_frames;
+
+    /* Tempo for the synced delay, pushed in once per block and only when it
+     * actually moves -- a param write is not free, and the BPM is constant
+     * for thousands of blocks at a time. */
+    if(g_host && g_host->get_bpm)
+    {
+        const float bpm = g_host->get_bpm();
+        if(bpm > 20.0f && bpm != inst->last_bpm)
+        {
+            inst->last_bpm = bpm;
+            char b[24];
+            snprintf(b, sizeof(b), "%.4f", bpm);
+            sd606_set_param(inst->engine, "dly_bpm", b);
+        }
+    }
 
     /* Advance the step sequencer. get_beat_position() < 0 or absent means no
      * transport — the sequencer idles and re-arms. 16th notes over one bar. */

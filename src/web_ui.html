@@ -126,17 +126,30 @@
   var DIST  = ["Diode", "Clip", "SAT", "BFZ", "PDIST", "Fold", "Crush"];
   var MDIST = ["Off", "Diode", "Clip", "SAT", "BFZ", "PDIST", "Fold", "Crush"];
   var CHOKE = ["Off", "CH>OH", "Mutual"];
+  var DIVS  = ["1/32", "1/16T", "1/16", "1/8T", "1/16.", "1/8", "1/4T",
+               "1/8.", "1/4", "1/2T", "1/4.", "1/2", "1/2."];
 
   /* lanes, in the DSP's order; n = the 606's instrument number style */
   var LANES = [
-    { id: "bd", name: "BASS DRUM", extras: [["bd_attack","Attack"],["bd_drift","Drift"]] },
-    { id: "sd", name: "SNARE DRUM", extras: [["sd_snappy","Snappy"],["sd_tone","Tone"]] },
+    { id: "bd", name: "BASS DRUM", extras: [["bd_attack","Attack"]] },
+    /* no Decay: the 606 snare has no such control; it is pinned to the fit */
+    { id: "sd", name: "SNARE DRUM", noDecay: true, extras: [["sd_snappy","Snappy"],["sd_tone","Tone"]] },
     { id: "lt", name: "LOW TOM",   extras: [] },
     { id: "ht", name: "HI TOM",    extras: [] },
     { id: "ch", name: "CLOSED HAT",extras: [["hh_choke","Choke",CHOKE]] },
     { id: "oh", name: "OPEN HAT",  extras: [] },
     { id: "cy", name: "CYMBAL",    extras: [] },
     { id: "cp", name: "HAND CLAP", extras: [["cp_noise","Noise"]] }
+  ];
+
+  /* The two send buses, reachable from the same selector -- they are pads 10
+   * and 11 on the device, right beside Master. No lane, so no mute button. */
+  var FX = [
+    { id: "rev", name: "REVERB", knobs: [["rev_decay","Decay"],["rev_tone","Tone"],
+                                         ["rev_hpf","HPF"],["rev_level","Level"]] },
+    { id: "dly", name: "DELAY",  knobs: [["dly_time","Time",DIVS],["dly_fdbk","Fdbk"],
+                                         ["dly_tone","Tone"],["dly_hpf","HPF"],
+                                         ["dly_level","Level"]] }
   ];
 
   var state = {}, widgets = {}, mutesMask = 0, lane = 0;
@@ -148,7 +161,8 @@
   }
   function apply(k, raw) {
     if (k === "ui_focus") {
-      var ln = parseInt(raw, 10);                      /* 0-7 lane, 8 = master */
+      var ln = parseInt(raw, 10);   /* 0-7 voice, 8 master, 9 reverb, 10 delay */
+      if (ln >= 9 && ln - 9 < FX.length) { if (LANES.length + (ln - 9) !== lane) selectLane(LANES.length + (ln - 9)); return; }
       if (ln >= 0 && ln < LANES.length && ln !== lane) selectLane(ln);
       return;
     }
@@ -217,36 +231,58 @@
 
   /* ---- instrument selector ---- */
   var inst = document.getElementById("inst"), instBtns = [];
-  LANES.forEach(function (L, i) {
+  LANES.concat(FX).forEach(function (L, i) {
     var b = document.createElement("button");
-    b.innerHTML = '<span class="n">' + (i + 1) + '</span>' + L.id.toUpperCase();
+    b.innerHTML = i < LANES.length
+        ? '<span class="n">' + (i + 1) + '</span>' + L.id.toUpperCase()
+        : L.id.toUpperCase();
     b.addEventListener("click", function () { selectLane(i); });
     inst.appendChild(b); instBtns.push(b);
   });
   var muteBtn = document.getElementById("mute");
   muteBtn.addEventListener("click", function () {
+    if (lane >= LANES.length) return;              /* the FX pages have no lane */
     mutesMask = (mutesMask ^ (1 << lane)) & 0xFF;
     schwungRemote.setParam(key("mutes"), String(mutesMask)); renderMute();
   });
-  function renderMute() { muteBtn.className = "mute" + ((mutesMask >> lane) & 1 ? " on" : ""); }
+  function renderMute() {
+    const isVoice = lane < LANES.length;
+    muteBtn.style.visibility = isVoice ? "visible" : "hidden";
+    muteBtn.className = "mute" + (isVoice && ((mutesMask >> lane) & 1) ? " on" : "");
+  }
 
   /* ---- selected voice's controls ---- */
   var voiceRow = document.getElementById("voice");
+  function addSep() {
+    var sp = document.createElement("div"); sp.className = "sep"; voiceRow.appendChild(sp);
+  }
+
   function buildVoice() {
     voiceRow.innerHTML = "";
+    if (lane >= LANES.length) {                    /* a send bus, not a voice */
+      var F = FX[lane - LANES.length];
+      F.knobs.forEach(function (x) {
+        if (x[2]) sel(voiceRow, x[0], x[1], x[2]); else knob(voiceRow, x[0], x[1]);
+      });
+      return;
+    }
     var L = LANES[lane], id = L.id;
     knob(voiceRow, id + "_tune", "Tune");
-    knob(voiceRow, id + "_decay", "Decay");
+    if (!L.noDecay) knob(voiceRow, id + "_decay", "Decay");
     L.extras.forEach(function (x) { if (x[2]) sel(voiceRow, x[0], x[1], x[2]); else knob(voiceRow, x[0], x[1]); });
-    var sp = document.createElement("div"); sp.className = "sep"; voiceRow.appendChild(sp);
+    addSep();
     knob(voiceRow, id + "_drive", "Drive");
     sel(voiceRow, id + "_dist_type", "Distortion", DIST);
+    addSep();
+    knob(voiceRow, id + "_rev", "Rev");
+    knob(voiceRow, id + "_dly", "Dly");
   }
 
   /* ---- master ---- */
   var master = document.getElementById("master");
   sel(master, "master_dist", "Master Dist", MDIST);
   knob(master, "master_drive", "Master Drive");
+  knob(master, "comp", "Comp");
   var sp2 = document.createElement("div"); sp2.className = "sep"; master.appendChild(sp2);
   sel(master, "hh_choke", "Hat Choke", CHOKE);
   sel(master, "note_map", "Note Map", ["Rack 36", "GM"]);
@@ -254,7 +290,8 @@
   function selectLane(i) {
     lane = i;
     instBtns.forEach(function (b, j) { b.className = j === i ? "on" : ""; });
-    document.getElementById("lane-name").textContent = LANES[i].name;
+    document.getElementById("lane-name").textContent =
+        (i < LANES.length ? LANES[i] : FX[i - LANES.length]).name;
     buildVoice(); renderMute();
     seed();
   }

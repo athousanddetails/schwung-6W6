@@ -34,20 +34,33 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
 (function () {
     "use strict";
 
-    /* raw pad note -> page key (page-follow). Left 4x4 block, bottom row
-     * BD SD LT HT, row above CH OH CY CP; pad 16 (note 87) is Master. */
+    /* raw pad note -> page key (page-follow). The left 4x4 block, counted
+     * from the bottom-left: pads 1-4 are notes 68-71, 5-8 are 76-79, 9-12 are
+     * 84-87. So the kit is the bottom two rows, and the row above it holds
+     * the three page-only pads:
+     *
+     *   pad  9 (84)  Master     pad 10 (85)  Reverb     pad 11 (86)  Delay
+     */
     var PAD2LEVEL = { 68: "bd", 69: "sd", 70: "lt", 71: "ht",
-                      76: "ch", 77: "oh", 78: "cy", 79: "cp", 87: "root" };
+                      76: "ch", 77: "oh", 78: "cy", 79: "cp",
+                      84: "root", 85: "rev", 86: "dly" };
 
     /* raw pad note -> 6W6 lane (Mute+Pad). Same order as the DSP's enum. */
     var PAD2LANE = { 68: 0, 69: 1, 70: 2, 71: 3, 76: 4, 77: 5, 78: 6, 79: 7 };
 
+    /* page key -> what the remote panel should show. 0-7 are the voices,
+     * 8 Master, 9 Reverb, 10 Delay. Separate from LEVEL2LANE below, which is
+     * only about which lane's MUTE the title bar reflects. */
+    var LEVEL2FOCUS = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7,
+                        root: 8, rev: 9, dly: 10 };
+
     /* page key -> lane whose mute the title indicator shows (-1 = none) */
-    var LEVEL2LANE = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7, root: -1 };
+    var LEVEL2LANE = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7,
+                       root: -1, rev: -1, dly: -1 };
 
     /* Pads that switch the page and never sound: they are not injected back
      * to Move, so Move never lights or records them. */
-    function isPageOnlyPad(n) { return n === 87; }
+    function isPageOnlyPad(n) { return n === 84 || n === 85 || n === 86; }
 
     /* Main-page lock: a jog CLICK while already on the Main page toggles it.
      * While locked, pads still play and still record, but the page stops
@@ -138,8 +151,8 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
     var lastFocus = -1;
     function goToLevel(levelKey) {
         if (!controller) return;
-        var lane = LEVEL2LANE[levelKey];
-        if (lane === undefined || lane < 0) lane = 8;      /* 8 = master */
+        var lane = LEVEL2FOCUS[levelKey];
+        if (lane === undefined) lane = 8;                  /* 8 = master */
         /* Only on a CHANGE. Every pad press calls this, and a param write is a
          * ~2.8 ms round-trip on the shared channel — more than a whole screen
          * redraw costs — so re-announcing the page you are already on is pure

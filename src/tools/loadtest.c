@@ -334,57 +334,120 @@ int main(int argc, char **argv)
     }
     /*
      * ---- v1 -> v2 state migration ----
-     * Saved patches store raw pot POSITIONS and enum INDICES. v2 changed the
-     * drive pot's range and moved Fold/Crush down the distortion list, so a
-     * v1 blob loaded verbatim would retune every drive knob and turn every
-     * saved Fold into SAT. Build a v1 blob by serialising known values and
-     * relabelling the version, then check what comes back.
+     * v1 stored 40 pots in ITS order; v2 deletes two of them (bd_drift,
+     * sd_decay) and appends 25 more, so position 4 used to be bd_drive and is
+     * now bd_level. A v1 blob therefore has to be placed BY NAME. This builds
+     * a real v1 blob rather than relabelling a v2 one -- relabelling would
+     * only prove the code agrees with itself.
+     *
+     * v1 order: bd_tune bd_decay bd_attack bd_drift bd_drive bd_level
+     *           sd_tune sd_decay sd_snappy sd_tone sd_drive sd_level ...
+     *           ... master_drive volume accent
+     * v1 enums: bd_dist sd_dist lt_dist ht_dist ch_dist hh_choke
+     *           oh_dist cy_dist cp_dist master_dist note_map
      */
     {
-        static char v1[8192];
-        api->set_param(inst, "bd_drive", "55");        /* v1 unity */
-        api->set_param(inst, "sd_drive", "0");         /* v1 far below unity */
-        api->set_param(inst, "master_drive", "55");
-        api->set_param(inst, "bd_dist_type", "2");     /* v1 Fold */
-        api->set_param(inst, "sd_dist_type", "3");     /* v1 Crush */
-        api->set_param(inst, "master_dist", "3");      /* v1 Fold */
-        n = api->get_param(inst, "state", v1, sizeof(v1));
-        CHECK(n > 20 && strstr(v1, "\"v\":2") != NULL, "fresh blobs are written as v2");
-        {   /* relabel it as the old version */
-            char *v = strstr(v1, "\"v\":2");
-            if(v) v[4] = '1';
-        }
-        api->set_param(inst, "state", v1);
+        static const char *kV1 =
+            "{\"v\":1,\"pots\":["
+            "11,22,33,44,55,66,"            /* bd: tune decay attack DRIFT drive level */
+            "77,88,99,12,55,64,"            /* sd: tune DECAY snappy tone drive level  */
+            "64,64,55,64, 64,64,55,64,"     /* lt, ht */
+            "64,64,55,64, 64,64,55,64,"     /* ch, oh */
+            "64,64,55,64, 64,64,64,55,64,"  /* cy, cp(+noise) */
+            "55,76,42],"                    /* master_drive volume accent */
+            "\"enums\":[2,3,0,0,0,1,0,0,0,3,0],\"mutes\":0}";
+        api->set_param(inst, "state", kV1);
 
+        api->get_param(inst, "bd_tune", buf, sizeof(buf));
+        CHECK(atoi(buf) == 11, "v1 blob: bd_tune lands by name (11)");
+        api->get_param(inst, "bd_attack", buf, sizeof(buf));
+        CHECK(atoi(buf) == 33, "v1 blob: bd_attack lands by name (33), not shifted by the deleted Drift");
+        api->get_param(inst, "bd_level", buf, sizeof(buf));
+        CHECK(atoi(buf) == 66, "v1 blob: bd_level lands by name (66)");
+        api->get_param(inst, "sd_snappy", buf, sizeof(buf));
+        CHECK(atoi(buf) == 99, "v1 blob: sd_snappy lands by name (99), past the deleted sd_decay");
+        api->get_param(inst, "sd_tone", buf, sizeof(buf));
+        CHECK(atoi(buf) == 12, "v1 blob: sd_tone lands by name (12)");
+        CHECK(api->get_param(inst, "bd_drift", buf, sizeof(buf)) < 0,
+              "bd_drift no longer exists at all (the 606 kick does not wander)");
+        CHECK(api->get_param(inst, "sd_decay", buf, sizeof(buf)) < 0,
+              "sd_decay no longer exists at all (the 606 snare has no decay control)");
+
+        /* drive converted through the engineering value, not the position */
         api->get_param(inst, "bd_drive", buf, sizeof(buf));
         CHECK(atoi(buf) == 7, "v1 drive pot 55 (unity) migrates to pot 7 — same drive, new range");
-        api->get_param(inst, "sd_drive", buf, sizeof(buf));
-        CHECK(atoi(buf) == 0, "v1 drive pot 0 clamps to 0 (the new range cannot attenuate)");
         api->get_param(inst, "master_drive", buf, sizeof(buf));
         CHECK(atoi(buf) == 7, "master_drive migrates the same way");
+        /* enums remapped: Fold 2->5, Crush 3->6, master Fold 3->6 */
         api->get_param(inst, "bd_dist_type", buf, sizeof(buf));
         CHECK(atoi(buf) == 5, "v1 Fold (2) migrates to the new Fold (5)");
         api->get_param(inst, "sd_dist_type", buf, sizeof(buf));
         CHECK(atoi(buf) == 6, "v1 Crush (3) migrates to the new Crush (6)");
         api->get_param(inst, "master_dist", buf, sizeof(buf));
         CHECK(atoi(buf) == 6, "v1 master Fold (3) migrates to 6");
+        /* things v1 never had come up at their defaults, not at garbage */
+        api->get_param(inst, "bd_rev", buf, sizeof(buf));
+        CHECK(atoi(buf) == 0, "a v1 patch gets the new sends at zero");
+        api->get_param(inst, "comp", buf, sizeof(buf));
+        CHECK(atoi(buf) == 0, "a v1 patch gets Comp at zero");
 
-        /* and a v2 blob must pass through untouched */
+        /* a v2 blob round-trips positionally, untouched */
         api->set_param(inst, "bd_drive", "40");
-        api->set_param(inst, "bd_dist_type", "3");
-        n = api->get_param(inst, "state", v1, sizeof(v1));
-        api->set_param(inst, "bd_drive", "0");
-        api->set_param(inst, "state", v1);
-        api->get_param(inst, "bd_drive", buf, sizeof(buf));
-        CHECK(atoi(buf) == 40, "a v2 blob is NOT migrated (drive stays 40)");
-        api->get_param(inst, "bd_dist_type", buf, sizeof(buf));
-        CHECK(atoi(buf) == 3, "a v2 blob's distortion type is left alone");
-        api->set_param(inst, "bd_drive", "8");
-        api->set_param(inst, "sd_drive", "8");
-        api->set_param(inst, "master_drive", "8");
-        api->set_param(inst, "bd_dist_type", "0");
-        api->set_param(inst, "sd_dist_type", "0");
+        api->set_param(inst, "cy_rev", "99");
+        {
+            static char v2[8192];
+            api->get_param(inst, "state", v2, sizeof(v2));
+            CHECK(strstr(v2, "\"v\":2") != NULL, "fresh blobs are written as v2");
+            api->set_param(inst, "bd_drive", "0");
+            api->set_param(inst, "cy_rev", "0");
+            api->set_param(inst, "state", v2);
+            api->get_param(inst, "bd_drive", buf, sizeof(buf));
+            CHECK(atoi(buf) == 40, "a v2 blob is NOT migrated (drive stays 40)");
+            api->get_param(inst, "cy_rev", buf, sizeof(buf));
+            CHECK(atoi(buf) == 99, "a v2 blob restores the new send pots too");
+        }
+        api->set_param(inst, "state", "");
+        for(int v = 0; v < 8; ++v)
+        {
+            char k[24];
+            snprintf(k, sizeof k, "%s_rev", ids[v]); api->set_param(inst, k, "0");
+            snprintf(k, sizeof k, "%s_dly", ids[v]); api->set_param(inst, k, "0");
+            snprintf(k, sizeof k, "%s_drive", ids[v]); api->set_param(inst, k, "8");
+            snprintf(k, sizeof k, "%s_dist_type", ids[v]); api->set_param(inst, k, "0");
+        }
         api->set_param(inst, "master_dist", "0");
+        api->set_param(inst, "master_drive", "8");
+        api->set_param(inst, "comp", "0");
+        api->set_param(inst, "mutes", "0");
+    }
+
+    /* ---- the master compressor ----
+     * These voices carry FREE-RUNNING noise, so the same note rendered later
+     * is never bit-identical to itself -- an exact-equality bypass test
+     * inside one instance is impossible, and the real proof that Comp at zero
+     * costs nothing is tools/ab_null.sh, which nulls two whole builds. Here,
+     * compare LEVELS: two comp=0 runs must agree far more closely with each
+     * other than either does with comp at full. */
+    {
+        api->set_param(inst, "mutes", "0");
+        double lvl[3];
+        const char *amt[3] = { "0", "0", "127" };
+        for(int k = 0; k < 3; ++k)
+        {
+            api->set_param(inst, "comp", amt[k]);
+            render_peak(600);
+            note_on(68, 120);
+            lvl[k] = render_peak(200);
+        }
+        const double noise_floor = fabs(lvl[0] - lvl[1]);
+        const double effect      = fabs(lvl[0] - lvl[2]);
+        char msg2[160];
+        snprintf(msg2, sizeof msg2,
+                 "Comp at full moves the bus well past run-to-run noise (%.4f vs %.4f)",
+                 effect, noise_floor);
+        CHECK(effect > noise_floor * 5.0 && effect > 0.005, msg2);
+        api->set_param(inst, "comp", "0");
+        render_peak(600);
     }
 
     /* the seven distortion types must all be reachable and audibly distinct */

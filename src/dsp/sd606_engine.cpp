@@ -17,6 +17,7 @@
 #include "sd606_cymbal.h"
 #include "sd606_metal_hw.h"
 #include "sd606_clap_voice.h"
+#include "sd606_fx.h"
 #include "sd606_metal_voice.h"
 #include "sd606_engine.h"
 #include "sd606_params.h"
@@ -29,6 +30,10 @@ using namespace SynthDrums606;
  * STORED value means -- the blob is positional and stores raw pot positions --
  * so v1 blobs are migrated on load. See migrate_v1(). */
 #define SD606_STATE_VERSION 2
+
+/* The snare's decay, fitted against the hardware and then pinned: the machine
+ * has no such control. 76/127 of the old (0,1) pot. */
+#define SD606_SD_DECAY_FIXED 0.5984252f
 
 /* A choke is a 2 ms fade, not a hard stop — cutting a ringing open hat dead
  * puts a click on the front of the closed hat that follows it. */
@@ -70,6 +75,7 @@ static const float kVoiceTrim[SD606_NUM_VOICES] = {
 struct VoiceSlots {
     int tune, decay, drive, level;   /* every voice has these four */
     int dist;                        /* enum slot                  */
+    int rev, dly;                    /* post-fader send amounts    */
 };
 
 struct VoiceRt {
@@ -121,12 +127,23 @@ struct sd606_engine {
     VoiceRt    rt[SD606_NUM_VOICES];
 
     /* Voice-specific extras that only some lanes have. */
-    int bd_attack, bd_drift, sd_snappy, sd_tone, cp_noise;
+    int bd_attack, sd_snappy, sd_tone, cp_noise;
     /* Globals. */
     int e_master_dist, e_choke, e_note_map;
     int p_master_drive, p_volume, p_accent;
 
     float crush_master[2];           /* master-stage crush decimator */
+
+    /* Send buses. Big buffers (the delay line alone is 88200 floats), which
+     * is why the engine is heap-allocated in sd606_create and never on a
+     * stack anywhere near the audio path. */
+    sd606_verb_t verb;
+    sd606_dly_t  dly;
+    sd606_glue_t glue;
+    int p_comp;
+    int p_rev_decay, p_rev_tone, p_rev_hpf, p_rev_level;
+    int p_dly_fdbk, p_dly_tone, p_dly_hpf, p_dly_level;
+    int e_dly_time;
     unsigned mutes;
     unsigned rng;                    /* per-hit kick drift */
 
@@ -136,6 +153,8 @@ struct sd606_engine {
     Sd606MetalVoice ch, oh, cy;   /* forked: see sd606_metal_voice.h */
     Sd606ClapVoice  cp;   /* forked: see sd606_clap_voice.h */
 };
+
+static void sd606_fx_sync(sd606_engine_t *e);
 
 const char *sd606_voice_id(int voice)
 {
@@ -165,15 +184,19 @@ sd606_engine_t *sd606_create(float sample_rate)
         const char *id = kVoiceIds[v];
         snprintf(key, sizeof(key), "%s_tune",      id); e->slot[v].tune  = find_pot(key);
         snprintf(key, sizeof(key), "%s_decay",     id); e->slot[v].decay = find_pot(key);
+        /* SD has no decay pot any more -- see SD606_SD_DECAY_FIXED. Point it
+         * at a valid slot so nothing ever indexes -1; the value is unused. */
+        if(e->slot[v].decay < 0) e->slot[v].decay = e->slot[v].tune;
         snprintf(key, sizeof(key), "%s_drive",     id); e->slot[v].drive = find_pot(key);
         snprintf(key, sizeof(key), "%s_level",     id); e->slot[v].level = find_pot(key);
         snprintf(key, sizeof(key), "%s_dist_type", id); e->slot[v].dist  = find_enum(key);
+        snprintf(key, sizeof(key), "%s_rev",       id); e->slot[v].rev   = find_pot(key);
+        snprintf(key, sizeof(key), "%s_dly",       id); e->slot[v].dly   = find_pot(key);
         e->rt[v].hit_gain   = 1.0f;
         e->rt[v].choke_gain = 1.0f;
         e->rt[v].choke_step = 0.0f;
     }
     e->bd_attack = find_pot("bd_attack");
-    e->bd_drift  = find_pot("bd_drift");
     e->sd_snappy = find_pot("sd_snappy");
     e->sd_tone   = find_pot("sd_tone");
     e->cp_noise  = find_pot("cp_noise");
@@ -183,6 +206,12 @@ sd606_engine_t *sd606_create(float sample_rate)
     e->e_master_dist  = find_enum("master_dist");
     e->e_choke        = find_enum("hh_choke");
     e->e_note_map     = find_enum("note_map");
+    e->p_rev_decay = find_pot("rev_decay"); e->p_rev_tone  = find_pot("rev_tone");
+    e->p_rev_hpf   = find_pot("rev_hpf");   e->p_rev_level = find_pot("rev_level");
+    e->p_dly_fdbk  = find_pot("dly_fdbk");  e->p_dly_tone  = find_pot("dly_tone");
+    e->p_dly_hpf   = find_pot("dly_hpf");   e->p_dly_level = find_pot("dly_level");
+    e->e_dly_time  = find_enum("dly_time");
+    e->p_comp      = find_pot("comp");
 
     const double sr = e->sample_rate;
     /* Distinct seeds so the per-hit analog variation of one voice does not
@@ -195,6 +224,16 @@ sd606_engine_t *sd606_create(float sample_rate)
     e->oh.init(sr, 0x6065u);
     e->cy.init(sr, 0x6066u);
     e->cp.init(sr, 0x0606C1A9u);
+
+    e->verb.hpf_hz = e->potv[e->p_rev_hpf];
+    e->dly.hpf_hz  = e->potv[e->p_dly_hpf];
+    sd606_verb_init(&e->verb, e->sample_rate);
+    sd606_dly_init(&e->dly, e->sample_rate);
+    e->dly.divi = e->env[e->e_dly_time];
+    e->dly.bpm  = 120.0f;
+    sd606_dly_retime(&e->dly, e->sample_rate);
+    e->dly.dcur = e->dly.time_ms * 0.001f * e->sample_rate;   /* no start-up sweep */
+    sd606_fx_sync(e);
     return e;
 }
 
@@ -258,17 +297,17 @@ void sd606_trigger(sd606_engine_t *e, int voice, int velocity)
 
     switch(voice)
     {
-    case SD606_BD: {
-        /* Drift is per-hit pitch jitter in semitones — the thing that stops a
-         * programmed 606 kick sounding like a copy-paste of itself. */
-        e->rng = e->rng * 1664525u + 1013904223u;
-        const float unit  = (float)((e->rng >> 8) & 0xFFFF) / 32767.5f - 1.0f;
-        const float jitter = unit * e->potv[e->bd_drift] * 1.5f;
-        e->bd.trigger(e->potv[e->bd_attack], decay, tune, jitter);
+    case SD606_BD:
+        /* No drift argument: the 606's kick does not wander from hit to hit,
+         * and the control that could make it (bd_drift) is gone. */
+        e->bd.trigger(e->potv[e->bd_attack], decay, tune, 0.0f);
         break;
-    }
     case SD606_SD:
-        e->sd.trigger(decay, tune, e->potv[e->sd_snappy], e->potv[e->sd_tone]);
+        /* The 606's snare has no decay control, so neither do we: pinned at
+         * the value fitted against the hardware recording (old pot 76 of
+         * 127). `decay` is ignored for this voice. */
+        e->sd.trigger(SD606_SD_DECAY_FIXED, tune, e->potv[e->sd_snappy],
+                      e->potv[e->sd_tone]);
         break;
     case SD606_LT: e->lt.trigger(kLowTomSpec,  decay, tune); break;
     case SD606_HT: e->ht.trigger(kHighTomSpec, decay, tune); break;
@@ -301,18 +340,25 @@ static inline float voice_sample(sd606_engine *e, int v, float raw)
  * sines each and three of them can be ringing at once. Guarding on the gate
  * gain also means a muted lane keeps rendering until its fade completes, then
  * disappears. */
-#define SD606_LANE(vid, expr) \
-    do { if(e->rt[vid].choke_gain > 0.0f) mix += voice_sample(e, vid, (expr)); } while(0)
+#define SD606_LANE(vid, expr)                                                 \
+    do { if(e->rt[vid].choke_gain > 0.0f) {                                   \
+             const float sv = voice_sample(e, vid, (expr));                   \
+             mix   += sv;                                                     \
+             /* post-fader sends: what you hear is what you send */           \
+             send_r += sv * e->potv[e->slot[vid].rev];                        \
+             send_d += sv * e->potv[e->slot[vid].dly];                        \
+         } } while(0)
 
 void sd606_render(sd606_engine_t *e, float *out, int frames)
 {
     const int   mdist  = e->env[e->e_master_dist];
     const float mdrive = e->potv[e->p_master_drive];
     const float vol    = e->potv[e->p_volume];
+    const float comp   = e->potv[e->p_comp];
 
     for(int i = 0; i < frames; ++i)
     {
-        float mix = 0.0f;
+        float mix = 0.0f, send_r = 0.0f, send_d = 0.0f;
         SD606_LANE(SD606_BD, e->bd.process());
         SD606_LANE(SD606_SD, e->sd.process());
         SD606_LANE(SD606_LT, e->lt.process());
@@ -322,8 +368,24 @@ void sd606_render(sd606_engine_t *e, float *out, int frames)
         SD606_LANE(SD606_CY, e->cy.process());
         SD606_LANE(SD606_CP, e->cp.process());
 
+        /* The wet returns BEFORE the master distortion, so that stage works
+         * on the whole picture rather than just the dry kit.
+         *
+         * With every send at 0 (the default) both ticks are fed exactly 0.0
+         * from silent state and return exactly 0.0, so this cannot perturb a
+         * single sample -- which is what tools/ab_null.sh checks. They are
+         * still ticked, not branched around: a send turned down while the
+         * tail is ringing must let that tail finish, and a branch on
+         * "input == 0" would chop it off. */
+        mix += sd606_verb_tick(&e->verb, send_r);
+        mix += sd606_dly_tick(&e->dly, send_d, e->sample_rate);
+
         /* Master stage. Option 0 is Off, so the kit can be left alone. */
         if(mdist > 0) mix = sd606_shape_st(mix, mdrive, mdist - 1, e->crush_master);
+        /* Glue after the distortion, before the volume -- and skipped
+         * entirely at zero, which is the default, so it cannot colour a kit
+         * nobody asked it to touch. */
+        if(comp > 0.001f) mix = sd606_glue_tick(&e->glue, mix, comp, e->sample_rate);
         mix *= vol;
 
         if(!(mix > -8.0f && mix < 8.0f)) mix = 0.0f;   /* also catches NaN */
@@ -333,8 +395,47 @@ void sd606_render(sd606_engine_t *e, float *out, int frames)
 
 /* ---- parameters ------------------------------------------------------- */
 
+/* The FX structs hold engineering values, not pot positions, so a write to
+ * any of their keys has to be pushed across. Cheap and rare; never per sample. */
+static void sd606_fx_sync(sd606_engine_t *e)
+{
+    e->verb.decay = e->potv[e->p_rev_decay];
+    e->verb.tone  = e->potv[e->p_rev_tone];
+    e->verb.level = e->potv[e->p_rev_level];
+    if(e->verb.hpf_hz != e->potv[e->p_rev_hpf])
+    {
+        e->verb.hpf_hz = e->potv[e->p_rev_hpf];
+        e->verb.hp.setHighPass(e->verb.hpf_hz, 0.7071f);
+    }
+    e->dly.fdbk  = e->potv[e->p_dly_fdbk];
+    e->dly.tone  = e->potv[e->p_dly_tone];
+    e->dly.level = e->potv[e->p_dly_level];
+    if(e->dly.hpf_hz != e->potv[e->p_dly_hpf])
+    {
+        e->dly.hpf_hz = e->potv[e->p_dly_hpf];
+        e->dly.hp.setHighPass(e->dly.hpf_hz, 0.7071f);
+    }
+    if(e->dly.divi != e->env[e->e_dly_time])
+    {
+        e->dly.divi = e->env[e->e_dly_time];
+        sd606_dly_retime(&e->dly, e->sample_rate);
+    }
+}
+
 int sd606_set_param(sd606_engine_t *e, const char *key, const char *val)
 {
+    /* Tempo, pushed in by the plugin each block. Not a pot: it has no UI and
+     * no stored position, it is just what the host says the BPM is. */
+    if(!strcmp(key, "dly_bpm"))
+    {
+        const float bpm = (float)atof(val);
+        if(bpm > 20.0f && bpm != e->dly.bpm)
+        {
+            e->dly.bpm = bpm;
+            sd606_dly_retime(&e->dly, e->sample_rate);
+        }
+        return 1;
+    }
     /* "default" resets a control to its fitted default. The kit's defaults
      * are not centred (they are fitted against a hardware 606), so a UI that
      * wants a reset gesture must not guess 64 — it asks. */
@@ -347,6 +448,7 @@ int sd606_set_param(sd606_engine_t *e, const char *key, const char *val)
         if(p > 127) p = 127;                 /* clamp, never wrap */
         e->pot[slot]  = p;
         e->potv[slot] = pot_value(slot, p);
+        sd606_fx_sync(e);
         return 1;
     }
     const int es = find_enum(key);
@@ -356,6 +458,7 @@ int sd606_set_param(sd606_engine_t *e, const char *key, const char *val)
         if(v < 0) v = 0;
         if(v >= g_sd606_enums[es].count) v = g_sd606_enums[es].count - 1;
         e->env[es] = v;
+        sd606_fx_sync(e);
         return 1;
     }
     return 0;
@@ -418,6 +521,54 @@ static const char *scan_ints(const char *p, int *dst, int max, int *got)
  * thing now. Old positions below ~52 were attenuating settings the new range
  * cannot express at all; they clamp to 0, which matches 9W9.
  */
+/* The pot table as SHIPPED IN v1.0.0, in its exact order. v2 deletes
+ * bd_drift and sd_decay and appends the sends, the FX and Comp, so a v1 blob
+ * cannot be read positionally any more -- position 4 used to be bd_drive and
+ * is now bd_level. Values are therefore scattered BY NAME, and the two
+ * deleted keys simply have nowhere to land. */
+static const char *const kV1PotKeys[40] = {
+    "bd_tune",
+    "bd_decay",
+    "bd_attack",
+    "bd_drift",
+    "bd_drive",
+    "bd_level",
+    "sd_tune",
+    "sd_decay",
+    "sd_snappy",
+    "sd_tone",
+    "sd_drive",
+    "sd_level",
+    "lt_tune",
+    "lt_decay",
+    "lt_drive",
+    "lt_level",
+    "ht_tune",
+    "ht_decay",
+    "ht_drive",
+    "ht_level",
+    "ch_tune",
+    "ch_decay",
+    "ch_drive",
+    "ch_level",
+    "oh_tune",
+    "oh_decay",
+    "oh_drive",
+    "oh_level",
+    "cy_tune",
+    "cy_decay",
+    "cy_drive",
+    "cy_level",
+    "cp_tune",
+    "cp_decay",
+    "cp_noise",
+    "cp_drive",
+    "cp_level",
+    "master_drive",
+    "volume",
+    "accent",
+};
+
 static void migrate_v1(sd606_engine_t *e)
 {
     for(int i = 0; i < SD606_NUM_POTS; ++i)
@@ -469,12 +620,30 @@ void sd606_deserialize(sd606_engine_t *e, const char *json)
     int vals[SD606_NUM_POTS > SD606_NUM_ENUMS ? SD606_NUM_POTS : SD606_NUM_ENUMS];
     int got = 0;
 
-    p = scan_ints(p, vals, SD606_NUM_POTS, &got);
-    for(int i = 0; i < got; ++i)
+    /* v1 blobs carry the OLD table, so they are placed by name; v2+ blobs
+     * are positional against the current table, as before. */
+    if(version < 2)
     {
-        int v = vals[i] < 0 ? 0 : (vals[i] > 127 ? 127 : vals[i]);
-        e->pot[i]  = v;
-        e->potv[i] = pot_value(i, v);
+        int v1vals[40];
+        p = scan_ints(p, v1vals, 40, &got);
+        for(int i = 0; i < got && i < 40; ++i)
+        {
+            const int slot = find_pot(kV1PotKeys[i]);
+            if(slot < 0) continue;              /* bd_drift, sd_decay: dropped */
+            int v = v1vals[i] < 0 ? 0 : (v1vals[i] > 127 ? 127 : v1vals[i]);
+            e->pot[slot]  = v;
+            e->potv[slot] = pot_value(slot, v);
+        }
+    }
+    else
+    {
+        p = scan_ints(p, vals, SD606_NUM_POTS, &got);
+        for(int i = 0; i < got; ++i)
+        {
+            int v = vals[i] < 0 ? 0 : (vals[i] > 127 ? 127 : vals[i]);
+            e->pot[i]  = v;
+            e->potv[i] = pot_value(i, v);
+        }
     }
 
     const char *q = strstr(json, "\"enums\"");
@@ -487,6 +656,7 @@ void sd606_deserialize(sd606_engine_t *e, const char *json)
     }
 
     if(version < 2) migrate_v1(e);
+    sd606_fx_sync(e);
 
     const char *mp = strstr(json, "\"mutes\"");
     if(mp) { mp = strchr(mp, ':'); if(mp) e->mutes = (unsigned)strtoul(mp + 1, NULL, 10)

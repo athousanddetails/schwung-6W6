@@ -36,14 +36,6 @@
             "max": 127
           },
           {
-            "key": "bd_drift",
-            "short": "DRIFT",
-            "full": "Drift",
-            "type": "int",
-            "min": 0,
-            "max": 127
-          },
-          {
             "key": "bd_drive",
             "short": "DRIVE",
             "full": "Drive",
@@ -74,7 +66,22 @@
             "min": 0,
             "max": 127
           },
-          null
+          {
+            "key": "bd_rev",
+            "short": "REV",
+            "full": "Rev",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "bd_dly",
+            "short": "DLY",
+            "full": "Dly",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          }
         ]
       ]
     },
@@ -86,14 +93,6 @@
             "key": "sd_tune",
             "short": "TUNE",
             "full": "Tune",
-            "type": "int",
-            "min": 0,
-            "max": 127
-          },
-          {
-            "key": "sd_decay",
-            "short": "DECAY",
-            "full": "Decay",
             "type": "int",
             "min": 0,
             "max": 127
@@ -145,7 +144,22 @@
             "min": 0,
             "max": 127
           },
-          null
+          {
+            "key": "sd_rev",
+            "short": "REV",
+            "full": "Rev",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "sd_dly",
+            "short": "DLY",
+            "full": "Dly",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          }
         ]
       ]
     },
@@ -200,8 +214,22 @@
             "min": 0,
             "max": 127
           },
-          null,
-          null,
+          {
+            "key": "lt_rev",
+            "short": "REV",
+            "full": "Rev",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "lt_dly",
+            "short": "DLY",
+            "full": "Dly",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
           null
         ]
       ]
@@ -257,8 +285,22 @@
             "min": 0,
             "max": 127
           },
-          null,
-          null,
+          {
+            "key": "ht_rev",
+            "short": "REV",
+            "full": "Rev",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "ht_dly",
+            "short": "DLY",
+            "full": "Dly",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
           null
         ]
       ]
@@ -325,8 +367,22 @@
               "Mutual"
             ]
           },
-          null,
-          null
+          {
+            "key": "ch_rev",
+            "short": "REV",
+            "full": "Rev",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "ch_dly",
+            "short": "DLY",
+            "full": "Dly",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          }
         ]
       ]
     },
@@ -381,8 +437,22 @@
             "min": 0,
             "max": 127
           },
-          null,
-          null,
+          {
+            "key": "oh_rev",
+            "short": "REV",
+            "full": "Rev",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "oh_dly",
+            "short": "DLY",
+            "full": "Dly",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
           null
         ]
       ]
@@ -438,8 +508,22 @@
             "min": 0,
             "max": 127
           },
-          null,
-          null,
+          {
+            "key": "cy_rev",
+            "short": "REV",
+            "full": "Rev",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "cy_dly",
+            "short": "DLY",
+            "full": "Dly",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
           null
         ]
       ]
@@ -503,6 +587,126 @@
             "min": 0,
             "max": 127
           },
+          {
+            "key": "cp_rev",
+            "short": "REV",
+            "full": "Rev",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "cp_dly",
+            "short": "DLY",
+            "full": "Dly",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          }
+        ]
+      ]
+    },
+    {
+      "name": "Reverb",
+      "rows": [
+        [
+          {
+            "key": "rev_decay",
+            "short": "DECAY",
+            "full": "Decay",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "rev_tone",
+            "short": "TONE",
+            "full": "Tone",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "rev_hpf",
+            "short": "HPF",
+            "full": "HPF",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "rev_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          null,
+          null,
+          null,
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Delay",
+      "rows": [
+        [
+          {
+            "key": "dly_time",
+            "short": "TIME",
+            "full": "Time",
+            "type": "enum",
+            "options": [
+              "1/32",
+              "1/16T",
+              "1/16",
+              "1/8T",
+              "1/16.",
+              "1/8",
+              "1/4T",
+              "1/8.",
+              "1/4",
+              "1/2T",
+              "1/4.",
+              "1/2",
+              "1/2."
+            ]
+          },
+          {
+            "key": "dly_fdbk",
+            "short": "FDBK",
+            "full": "Fdbk",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "dly_tone",
+            "short": "TONE",
+            "full": "Tone",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "dly_hpf",
+            "short": "HPF",
+            "full": "HPF",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
+            "key": "dly_level",
+            "short": "LEVEL",
+            "full": "Level",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          null,
           null,
           null
         ]
@@ -554,6 +758,14 @@
             "max": 127
           },
           {
+            "key": "comp",
+            "short": "COMP",
+            "full": "Comp",
+            "type": "int",
+            "min": 0,
+            "max": 127
+          },
+          {
             "key": "hh_choke",
             "short": "CHOKE",
             "full": "Choke",
@@ -574,7 +786,6 @@
               "GM"
             ]
           },
-          null,
           null
         ]
       ]
