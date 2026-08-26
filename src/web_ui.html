@@ -153,6 +153,7 @@
   ];
 
   var state = {}, widgets = {}, mutesMask = 0, lane = 0;
+  var persistentKeys = [];   /* widgets outside the swappable voice row */
   function key(k) { return "synth:" + k; }
   function addWidget(k, fn) { (widgets[k] = widgets[k] || []).push(fn); }
   function send(k, v) {
@@ -162,13 +163,18 @@
   function apply(k, raw) {
     if (k === "ui_focus") {
       var ln = parseInt(raw, 10);   /* 0-7 voice, 8 master, 9 reverb, 10 delay */
-      if (ln >= 9 && ln - 9 < FX.length) { if (LANES.length + (ln - 9) !== lane) selectLane(LANES.length + (ln - 9)); return; }
-      if (ln >= 0 && ln < LANES.length && ln !== lane) selectLane(ln);
+      if (ln >= 9 && ln - 9 < FX.length) {
+        if (LANES.length + (ln - 9) !== lane) selectLane(LANES.length + (ln - 9), true);
+        return;
+      }
+      if (ln >= 0 && ln < LANES.length && ln !== lane) selectLane(ln, true);
       return;
     }
     var v = parseInt(raw, 10); if (isNaN(v)) return;
     if (k === "mutes") { mutesMask = v; renderMute(); return; }
-    if (widgets[k]) { state[k] = v; widgets[k].forEach(function (fn) { fn(v); }); }
+    state[k] = v;                    /* cache first: a page you have not
+                                        opened yet still needs its values */
+    if (widgets[k]) widgets[k].forEach(function (fn) { fn(v); });
   }
 
   /* ---- widgets ---- */
@@ -258,6 +264,13 @@
   }
 
   function buildVoice() {
+    /* Drop the widgets belonging to the page being replaced -- they point at
+     * DOM that is about to be detached, and without this the list grows on
+     * every switch and every update walks the dead ones too. The header,
+     * master row and level strip are rebuilt from `keep`. */
+    var keep = {};
+    persistentKeys.forEach(function (k) { if (widgets[k]) keep[k] = widgets[k]; });
+    widgets = keep;
     voiceRow.innerHTML = "";
     if (lane >= LANES.length) {                    /* a send bus, not a voice */
       var F = FX[lane - LANES.length];
@@ -287,8 +300,16 @@
   sel(master, "hh_choke", "Hat Choke", CHOKE);
   sel(master, "note_map", "Note Map", ["Rack 36", "GM"]);
 
-  function selectLane(i) {
+  function selectLane(i, fromDevice) {
     lane = i;
+    /* Bidirectional. Picking an instrument here tells the device to show the
+     * same page; without this the device's own ui_focus pushes straight back
+     * and the panel snaps to whatever the Move is on. Not echoed when the
+     * device is the one that asked. */
+    if (!fromDevice) {
+      var focus = i < LANES.length ? i : LANES.length + 1 + (i - LANES.length);
+      schwungRemote.setParam(key("ui_focus"), String(focus));
+    }
     instBtns.forEach(function (b, j) { b.className = j === i ? "on" : ""; });
     document.getElementById("lane-name").textContent =
         (i < LANES.length ? LANES[i] : FX[i - LANES.length]).name;
@@ -312,7 +333,9 @@
    * re-reads it on its periodic refresh. Handled in apply() so seed, refresh
    * and live stream take the same path. */
 
-  selectLane(0);
+  /* mark the widgets that survive a page switch, then open the first voice */
+  persistentKeys = Object.keys(widgets);
+  selectLane(0, true);
   setTimeout(seed, 400); setTimeout(seed, 1500);
 })();
 </script>

@@ -79,26 +79,30 @@ check(true, "first tick renders without throwing");
 /* a peek at the controller through the closure is not possible; infer from behaviour */
 const note = (n, v) => ui.onMidiMessageInternal(new Uint8Array([0x90, n, v]));
 const off  = n => ui.onMidiMessageInternal(new Uint8Array([0x80, n, 0]));
+/* The page is announced by tick(), not by the pad handler -- one place, so it
+ * is published however the page moved (pad, jog, or the panel asking). Hitting
+ * a pad and reading setLog without a frame in between sees nothing. */
+const hit = (n, v = 100) => { note(n, v); off(n); ui.tick(); };
 
 /* plain pad: reaches Move, no param writes */
 injected = []; setLog.length = 0;
-note(68, 100); off(68);
+note(68, 100); off(68); ui.tick();
 check(injected.length === 2 && injected[0][0] === 0x09 && injected[0][2] === 68, "plain pad press+release pass through to Move");
 check(setLog.length === 1 && setLog[0][0] === "synth:ui_focus" && setLog[0][1] === "0",
       "plain pad publishes only synth:ui_focus=0 (BD lane, for the remote panel to follow)");
-setLog.length = 0; note(68, 100); off(68); note(68, 100); off(68);
+setLog.length = 0; hit(68); hit(68);
 check(setLog.length === 0, "hitting the SAME pad again writes nothing (a param write is a 2.8 ms round-trip)");
-setLog.length = 0; note(69, 100); off(69);
+setLog.length = 0; hit(69);
 check(setLog.length === 1 && setLog[0][1] === "1", "moving to another pad does write (lane 1)");
 
 /* pad 16 = master page: never reaches Move */
-injected = []; setLog.length = 0; note(84, 100); off(84);
+injected = []; setLog.length = 0; hit(84);
 check(injected.length === 0, "pad 9 (master) never sounds");
 check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "8"), "pad 9 publishes ui_focus=8 (master)");
-injected = []; setLog.length = 0; note(85, 100); off(85);
+injected = []; setLog.length = 0; hit(85);
 check(injected.length === 0, "pad 10 (reverb) never sounds");
 check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "9"), "pad 10 opens Reverb (focus 9)");
-injected = []; setLog.length = 0; note(86, 100); off(86);
+injected = []; setLog.length = 0; hit(86);
 check(injected.length === 0, "pad 11 (delay) never sounds");
 check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "10"), "pad 11 opens Delay (focus 10)");
 
@@ -119,6 +123,23 @@ ui.tick();                                                   /* title shows [M];
 check(true, "tick with a muted lane renders");
 ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 127])); note(78, 100); off(78); ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 0]));
 check(params["synth:mutes"] === "0", "second Mute+Pad clears it");
+
+/* ---- the panel can drive the device, not just watch it ----
+ * The panel writes synth:ui_focus when you pick an instrument there; the
+ * editor polls it and follows. Without this the device's own announcement
+ * pushed straight back and the panel snapped to whatever the Move was on. */
+{
+  hit(68);                                   /* device on the kick */
+  params["synth:ui_focus"] = "3";             /* the panel asks for Hi Tom */
+  setLog.length = 0;
+  for (let i = 0; i < 10; i++) ui.tick();     /* polled once every 8 ticks */
+  check(!setLog.some(([k, v]) => k === "synth:ui_focus" && v === "0"),
+        "the editor does not argue back with its old page");
+  params["synth:ui_focus"] = "9";             /* and a bus page */
+  for (let i = 0; i < 10; i++) ui.tick();
+  check(spied.title != null, "still rendering after following the panel");
+  hit(68);
+}
 
 /* ---- Move's own gestures win: Delete/Copy + Pad ----
  * Steps recorded on a page-only pad by another module were impossible to
@@ -150,13 +171,13 @@ jogClick(); ui.tick();
 check(globalThis.__6w6_main_lock === true, "jog click on Main arms the lock");
 
 setLog.length = 0; injected = [];
-note(69, 100); off(69);
+note(69, 100); off(69); ui.tick();
 check(!setLog.some(([k]) => k === "synth:ui_focus"), "locked: a pad no longer moves the page");
 check(injected.length === 2, "locked: the pad still plays and still records");
 
 /* Shift+Pad is an explicit 'take me there' and must still navigate */
 shift = true; setLog.length = 0;
-note(70, 100); off(70); shift = false;
+note(70, 100); off(70); shift = false; ui.tick();
 check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "2"),
       "locked: Shift+Pad still navigates (lane 2)");
 
@@ -173,7 +194,7 @@ check(globalThis.__6w6_main_lock === false, "a second jog click, on Main, unlock
 ui.tick();
 check(!/\[L\]/.test(spied.title || ""), "unlocked: [L] is gone (" + spied.title + ")");
 setLog.length = 0;
-note(69, 100); off(69);
+hit(69);
 check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "1"),
       "unlocked: pads move the page again");
 

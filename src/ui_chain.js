@@ -53,6 +53,8 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
      * only about which lane's MUTE the title bar reflects. */
     var LEVEL2FOCUS = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7,
                         root: 8, rev: 9, dly: 10 };
+    var FOCUS2LEVEL = ["bd", "sd", "lt", "ht", "ch", "oh", "cy", "cp",
+                       "root", "rev", "dly"];
 
     /* page key -> lane whose mute the title indicator shows (-1 = none) */
     var LEVEL2LANE = { bd: 0, sd: 1, lt: 2, ht: 3, ch: 4, oh: 5, cy: 6, cp: 7,
@@ -150,18 +152,12 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
      * page id so the remote panel follows. A set_param, not a read: the shim
      * only tells schwung-manager about WRITES. */
     var lastFocus = -1;
+    var focusPoll = 0;
     function goToLevel(levelKey) {
         if (!controller) return;
-        var lane = LEVEL2FOCUS[levelKey];
-        if (lane === undefined) lane = 8;                  /* 8 = master */
-        /* Only on a CHANGE. Every pad press calls this, and a param write is a
-         * ~2.8 ms round-trip on the shared channel — more than a whole screen
-         * redraw costs — so re-announcing the page you are already on is pure
-         * waste on the path the editor needs for its own reads. */
-        if (lane !== lastFocus) {
-            lastFocus = lane;
-            ctlSetParam("synth:ui_focus", String(lane));
-        }
+        /* Publishing the page is the TICK's job, not this function's: the
+         * page also moves by jog, and doing it in one place means it is
+         * announced however it moved. */
         var pages = controller.pages;
         for (var i = 0; i < pages.length; i++) {
             if (pages[i].level === levelKey ||
@@ -235,6 +231,32 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
 
         if (hintUntil && Date.now() >= hintUntil) dismissHint();
         controller.setReveal(shiftHeld());
+
+        /*
+         * Page sync with the remote panel, both ways.
+         *
+         * OUT: publish whatever page is on screen, however it got there --
+         * pads used to be the only thing that announced it, so jogging to
+         * another page left the panel behind.
+         *
+         * IN: the panel writes the same key when you pick an instrument
+         * there. Poll it rarely: a param read is a ~2.8 ms round-trip, more
+         * than a whole page render, so once every 8 ticks (~7 Hz) is plenty
+         * for a page switch and costs almost nothing. Only read when we have
+         * nothing to announce, so the two directions never fight.
+         */
+        var focusNow = LEVEL2FOCUS[controller.page ? controller.page.level : null];
+        if (focusNow === undefined) focusNow = 8;
+        if (focusNow !== lastFocus) {
+            lastFocus = focusNow;
+            ctlSetParam("synth:ui_focus", String(focusNow));
+        } else if ((++focusPoll & 7) === 0) {
+            var want = parseInt(ctlGetParam("synth:ui_focus"), 10);
+            if (!isNaN(want) && want !== lastFocus && FOCUS2LEVEL[want]) {
+                lastFocus = want;
+                goToLevel(FOCUS2LEVEL[want]);
+            }
+        }
         controller.tick();
 
         /* The grid paces its own redraws; draw every tick like the stock
