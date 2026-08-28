@@ -156,7 +156,12 @@ GLOBALS = [
     # -1.1 dBFS from here, so the kit leaves real headroom for whatever
     # the chain puts after it instead of arriving already clipped.
     P("volume", "Volume", 0.0, 1.0, LIN, 76),
-    P("accent", "Accent", 1.0, 4.0, LIN, 42),               # 2.0x on accented hits
+    # No Accent pot. Velocity replaced it: accent WAS the level a hard hit
+    # reached, and that is now simply the top of the velocity range. The gain
+    # it used to contribute is folded into SD606_FULL_VELOCITY_GAIN so nothing
+    # gets quieter -- deleting it and anchoring at 1.0 would drop the whole kit
+    # 6 dB, because 1.0 is the UNACCENTED level and a pattern from Move (which
+    # sends velocity 100 and up) had always been playing at the accented one.
     # One-knob bus glue, ported from 9W9. NOT 606 circuitry and honest about
     # it: at zero the stage is not in the path at all (bit-identical), and the
     # knob blends threshold, ratio and auto-makeup together.
@@ -187,13 +192,39 @@ def viz_for(p):
         return False
     return None
 
+# Schwung's LFO / modulation picker lists a module's parameters as ONE FLAT
+# LIST, so eight voices each contributing a "Decay" gave eight identical rows
+# and nothing said which pad you were about to automate. chain_params `name`
+# is what that picker shows, so it carries a prefix.
+#
+# The prefixes are the machine's own two-letter panel legend -- BD SD LT HT CY
+# OH CH, exactly as they are silk-screened on a 606 -- plus CP for the clap the
+# 606 never had, and REV/DLY for the two buses.
+#
+# The PAGE label must stay short ("Decay"), because the knob grid squeezes it
+# into about five characters. Those are different fields: param_meta.mjs
+# resolves `label || name || key`, so the hierarchy entry supplies `label` and
+# wins on the page, while chain_params supplies the prefixed `name` and wins in
+# the picker. Emitting `name` on the hierarchy entry -- which is what it used
+# to do, and what validate_contract.mjs asks for -- makes the prefix leak onto
+# the page instead.
+PICKER_PREFIX = {"bd": "BD", "sd": "SD", "lt": "LT", "ht": "HT",
+                 "ch": "CH", "oh": "OH", "cy": "CY", "cp": "CP",
+                 "rev": "REV", "dly": "DLY"}
+
+def picker_name(key, name):
+    head = key.split("_", 1)[0]
+    pre = PICKER_PREFIX.get(head)
+    return f"{pre} {name}" if pre else name
+
+
 def chain_param(p):
     if p["kind"] == "enum":
-        d = {"key": p["key"], "name": p["name"], "type": "enum",
-             "options": p["options"]}
+        d = {"key": p["key"], "name": picker_name(p["key"], p["name"]),
+             "type": "enum", "options": p["options"]}
     else:
-        d = {"key": p["key"], "name": p["name"], "type": "int",
-             "min": 0, "max": 127}
+        d = {"key": p["key"], "name": picker_name(p["key"], p["name"]),
+             "type": "int", "min": 0, "max": 127}
     # The fitted default, so a reset gesture (stock Mute+knob, Movy, the web
     # panel's double-click) lands on the 606 and not on a guessed 64.
     d["default"] = p["default"]
@@ -250,19 +281,18 @@ for pid, label, params in PAGES:
         raise SystemExit(f"page {pid} has {len(full)} params -- max 8 knobs")
     levels[pid] = {"name": label,
                    "knobs": [p["key"] for p in full],
-                   "params": [{"key": p["key"], "name": p["name"]} for p in full]}
+                   "params": [{"key": p["key"], "label": p["name"]} for p in full]}
     root.append({"level": pid, "label": label})
 
 for pid, label, params in FX_PAGES:
     levels[pid] = {"name": label,
                    "knobs": [p["key"] for p in params],
-                   "params": [{"key": p["key"], "name": p["name"]} for p in params]}
+                   "params": [{"key": p["key"], "label": p["name"]} for p in params]}
     root.append({"level": pid, "label": label})
 
-root += [{"key": p["key"], "name": p["name"]} for p in GLOBALS]
+root += [{"key": p["key"], "label": p["name"]} for p in GLOBALS]
 levels["root"] = {"name": "6W6",
-                  "knobs": ["master_dist", "master_drive", "comp", "volume", "accent",
-                            "vel_depth"],
+                  "knobs": ["master_dist", "master_drive", "comp", "volume", "vel_depth"],
                   "params": root}
 
 # Two plugin-level keys that live on NO page but must be in chain_params: the

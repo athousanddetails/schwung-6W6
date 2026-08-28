@@ -79,23 +79,22 @@
     {
       "title": "Velocity",
       "lines": [
-        "Accent is a SWITCH,",
-        "like the machine:",
-        "at velocity 100 and",
-        "over, the accent",
-        "level; under it, the",
-        "note used to be the",
-        "same however hard",
-        "you hit - so hat",
-        "grooves came out",
-        "flat.",
+        "Velocity sets the",
+        "level, all the way",
+        "up - no accent",
+        "switch, no step in",
+        "the middle. A hit at",
+        "127 is the loudest",
+        "the kit gets.",
         "",
         "VELOCITY on Master",
-        "opens that up. Full",
-        "= velocity scales",
-        "the note below the",
-        "accent. Zero = the",
-        "old switch only."
+        "is how far a soft",
+        "hit falls below it:",
+        "0 = every hit the",
+        "same, full = the",
+        "widest range. It",
+        "only carves DOWN,",
+        "never boosts."
       ]
     },
     {

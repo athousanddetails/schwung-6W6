@@ -750,14 +750,6 @@
             "max": 127
           },
           {
-            "key": "accent",
-            "short": "ACNT",
-            "full": "Accent",
-            "type": "int",
-            "min": 0,
-            "max": 127
-          },
-          {
             "key": "comp",
             "short": "COMP",
             "full": "Comp",
@@ -793,7 +785,8 @@
               "Rack 36",
               "GM"
             ]
-          }
+          },
+          null
         ]
       ]
     }

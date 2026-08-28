@@ -25,8 +25,8 @@ typedef enum {
     SD606_NUM_VOICES
 } sd606_voice_t;
 
-/* velocity 0..127; >= this applies the global accent, same as 9W9. */
-#define SD606_ACCENT_VELOCITY 100
+/* Velocity has no threshold: level follows it all the way up, reaching the
+ * Accent gain at 127. See the comment in sd606_trigger. */
 
 #ifdef __cplusplus
 extern "C" {

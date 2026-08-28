@@ -56,7 +56,7 @@ if [ "${RELOAD:-1}" = "1" ]; then
     # reload_slot talks HTTP to schwung-manager, so it needs an address, not
     # an ssh alias; take the alias's HostName when one is configured.
     RHOST=$(ssh -G "$HOST" 2>/dev/null | awk '/^hostname /{print $2; exit}')
-    python3 "$SRC/scripts/reload_slot.py" "${RHOST:-$HOST}" "${SLOT:-0}" 6w6 \
+    python3 "$SRC/scripts/reload_slot.py" "${RHOST:-$HOST}" "${SLOT:--1}" 6w6 \
         || echo "    (could not reload automatically - re-pick 6W6 in the slot)"
 fi
 

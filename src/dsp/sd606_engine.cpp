@@ -29,11 +29,25 @@ using namespace SynthDrums606;
  * grew 4->7 / 5->8 with Fold and Crush moving. Both silently change what a
  * STORED value means -- the blob is positional and stores raw pot positions --
  * so v1 blobs are migrated on load. See migrate_v1(). */
-#define SD606_STATE_VERSION 2
+/* 3: the Accent pot is gone -- velocity subsumed it -- which renumbers
+ * everything after it. v1 and v2 blobs are both loaded by NAME. */
+#define SD606_STATE_VERSION 3
 
 /* The snare's decay, fitted against the hardware and then pinned: the machine
  * has no such control. 76/127 of the old (0,1) pot. */
 #define SD606_SD_DECAY_FIXED 0.5984252f
+
+/*
+ * The gain a FULL-velocity hit reaches. This is the old Accent pot's default
+ * (1 + 42/127 * 3), kept as a constant when the control was removed.
+ *
+ * The number matters. Accent was never "extra" -- it was the level a pattern
+ * from Move actually played at, because Move sends velocity 100 and up. Drop
+ * the pot and anchor the velocity line at 1.0 instead and the whole kit comes
+ * back 6 dB quieter, which is the trap 9W9 caught before shipping. Anchoring
+ * here keeps every existing pattern at exactly the level it had.
+ */
+#define SD606_FULL_VELOCITY_GAIN 1.9921260f
 
 /*
  * Drive at the bottom of the knob must be TRANSPARENT, and with a (0.85, 12)
@@ -144,7 +158,7 @@ struct sd606_engine {
     int bd_attack, sd_snappy, sd_tone, cp_noise;
     /* Globals. */
     int e_master_dist, e_choke, e_note_map;
-    int p_master_drive, p_volume, p_accent, p_vel_depth;
+    int p_master_drive, p_volume, p_vel_depth;
 
     float crush_master[2];           /* master-stage crush decimator */
 
@@ -216,7 +230,6 @@ sd606_engine_t *sd606_create(float sample_rate)
     e->cp_noise  = find_pot("cp_noise");
     e->p_master_drive = find_pot("master_drive");
     e->p_volume       = find_pot("volume");
-    e->p_accent       = find_pot("accent");
     e->p_vel_depth    = find_pot("vel_depth");
     e->e_master_dist  = find_enum("master_dist");
     e->e_choke        = find_enum("hh_choke");
@@ -291,30 +304,33 @@ void sd606_trigger(sd606_engine_t *e, int voice, int velocity)
     if(e->mutes & (1u << voice)) return;
 
     /*
-     * Accent, and the velocity underneath it.
+     * How loud this hit is, from its velocity.
      *
-     * The switch is the machine's: at or above SD606_ACCENT_VELOCITY the
-     * accent lifts the voice, and below it every note used to come out at
-     * exactly the same level -- which is what made velocity from Move's
-     * sequencer look broken. A hat at 30 and a hat at 90 were identical, so
-     * hat grooves were flat.
+     * Accent is the TOP: a full-velocity hit reaches it whatever Velocity is
+     * set to, and softer hits come down from there. Velocity is how far down
+     * -- 0 means every hit plays at Accent, which is what this kit sounded
+     * like before velocity existed at all.
      *
-     * vel_depth blends a continuous law into the SUB-ACCENT range only:
-     * gain = velocity / SD606_ACCENT_VELOCITY, so a note at 99 stays
-     * essentially where it was and the dynamics open up beneath it. Accented
-     * notes keep the accent gain exactly, at every depth, so the accent still
-     * snaps the way the hardware does.
+     * Ported from 9W9 along with the three wrong turns it took first, each
+     * worth not repeating:
+     *   1. The machine's accent SWITCH, reproduced literally. From a
+     *      sequencer that is a 6 dB cliff between velocity 99 and 100 with a
+     *      flat shelf either side, and velocity looks broken. 6W6 shipped
+     *      this in v1.2.0.
+     *   2. One line, but pivoting mid-range, so turning Velocity UP made hard
+     *      hits louder -- the knob moved the kit's loudness, not its dynamics.
+     *   3. Anchored at 1.0 with Accent deleted. Tidy, and it quietly drops
+     *      the whole kit 6 dB: 1.0 is the UNACCENTED level, and a pattern
+     *      from Move (velocity 100 and up) had always played at the accented
+     *      one.
+     * Anchoring at Accent keeps the reference level where it has always been,
+     * and the knob only ever carves downwards from it.
      */
-    float accent;
-    if(velocity >= SD606_ACCENT_VELOCITY)
-    {
-        accent = e->potv[e->p_accent];
-    }
-    else
-    {
-        const float v = (float)velocity * (1.0f / (float)SD606_ACCENT_VELOCITY);
-        accent = 1.0f + (v - 1.0f) * e->potv[e->p_vel_depth];
-    }
+    const int   vi = velocity > 127 ? 127 : velocity;
+    const float accent = SD606_FULL_VELOCITY_GAIN
+                       * (1.0f - e->potv[e->p_vel_depth]
+                                 * (1.0f - (float)vi * (1.0f / 127.0f)));
+
     e->rt[voice].hit_gain   = accent;
     e->rt[voice].choke_gain = 1.0f;
     e->rt[voice].choke_step = 0.0f;
@@ -624,6 +640,76 @@ static const char *const kV1PotKeys[40] = {
     "accent",
 };
 
+/* The pot table as shipped in v1.2.0. v3 deletes `accent`, which sat between
+ * volume and comp, so everything after it moved and a v2 blob cannot be read
+ * positionally either. Same treatment as v1: scattered by name. */
+static const char *const kV2PotKeys[64] = {
+    "bd_tune",
+    "bd_decay",
+    "bd_attack",
+    "bd_drive",
+    "bd_level",
+    "sd_tune",
+    "sd_snappy",
+    "sd_tone",
+    "sd_drive",
+    "sd_level",
+    "lt_tune",
+    "lt_decay",
+    "lt_drive",
+    "lt_level",
+    "ht_tune",
+    "ht_decay",
+    "ht_drive",
+    "ht_level",
+    "ch_tune",
+    "ch_decay",
+    "ch_drive",
+    "ch_level",
+    "oh_tune",
+    "oh_decay",
+    "oh_drive",
+    "oh_level",
+    "cy_tune",
+    "cy_decay",
+    "cy_drive",
+    "cy_level",
+    "cp_tune",
+    "cp_decay",
+    "cp_noise",
+    "cp_drive",
+    "cp_level",
+    "master_drive",
+    "volume",
+    "accent",
+    "comp",
+    "vel_depth",
+    "bd_rev",
+    "bd_dly",
+    "sd_rev",
+    "sd_dly",
+    "lt_rev",
+    "lt_dly",
+    "ht_rev",
+    "ht_dly",
+    "ch_rev",
+    "ch_dly",
+    "oh_rev",
+    "oh_dly",
+    "cy_rev",
+    "cy_dly",
+    "cp_rev",
+    "cp_dly",
+    "rev_decay",
+    "rev_tone",
+    "rev_hpf",
+    "rev_level",
+    "dly_fdbk",
+    "dly_tone",
+    "dly_hpf",
+    "dly_level",
+};
+
 static void migrate_v1(sd606_engine_t *e)
 {
     for(int i = 0; i < SD606_NUM_POTS; ++i)
@@ -675,17 +761,20 @@ void sd606_deserialize(sd606_engine_t *e, const char *json)
     int vals[SD606_NUM_POTS > SD606_NUM_ENUMS ? SD606_NUM_POTS : SD606_NUM_ENUMS];
     int got = 0;
 
-    /* v1 blobs carry the OLD table, so they are placed by name; v2+ blobs
-     * are positional against the current table, as before. */
-    if(version < 2)
+    /* Older blobs carry an older table, so they are placed by NAME against
+     * the order that shipped with them; v3+ blobs are positional against the
+     * current table. Keys that no longer exist simply have nowhere to land. */
+    if(version < 3)
     {
-        int v1vals[40];
-        p = scan_ints(p, v1vals, 40, &got);
-        for(int i = 0; i < got && i < 40; ++i)
+        const char *const *keys = version < 2 ? kV1PotKeys : kV2PotKeys;
+        const int n = version < 2 ? 40 : 64;
+        int old[64];
+        p = scan_ints(p, old, n, &got);
+        for(int i = 0; i < got && i < n; ++i)
         {
-            const int slot = find_pot(kV1PotKeys[i]);
-            if(slot < 0) continue;              /* bd_drift, sd_decay: dropped */
-            int v = v1vals[i] < 0 ? 0 : (v1vals[i] > 127 ? 127 : v1vals[i]);
+            const int slot = find_pot(keys[i]);
+            if(slot < 0) continue;      /* bd_drift, sd_decay, accent: dropped */
+            int v = old[i] < 0 ? 0 : (old[i] > 127 ? 127 : old[i]);
             e->pot[slot]  = v;
             e->potv[slot] = pot_value(slot, v);
         }
@@ -710,7 +799,7 @@ void sd606_deserialize(sd606_engine_t *e, const char *json)
         e->env[i] = v;
     }
 
-    if(version < 2) migrate_v1(e);
+    if(version < 2) migrate_v1(e);   /* drive range + distortion remap */
     sd606_fx_sync(e);
 
     const char *mp = strstr(json, "\"mutes\"");
@@ -721,3 +810,30 @@ void sd606_deserialize(sd606_engine_t *e, const char *json)
 /* Read-only view of the kit balance, for the trim-measurement probe in
  * tools/. Not part of the plugin surface. */
 extern "C" const float *sd606_debug_trim(void) { return kVoiceTrim; }
+
+/* Report every slot index the engine resolved, so a probe can assert none is
+ * -1. find_pot returning -1 means potv[-1] on the audio path. */
+extern "C" int sd606_debug_slots(sd606_engine_t *e, const char **names, int *idx, int max)
+{
+    int n = 0;
+    #define SLOT(nm, v) do { if(n < max) { names[n] = nm; idx[n] = (v); ++n; } } while(0)
+    for(int v = 0; v < SD606_NUM_VOICES; ++v)
+    {
+        SLOT("tune", e->slot[v].tune);   SLOT("decay", e->slot[v].decay);
+        SLOT("drive", e->slot[v].drive); SLOT("level", e->slot[v].level);
+        SLOT("dist", e->slot[v].dist);   SLOT("rev", e->slot[v].rev);
+        SLOT("dly", e->slot[v].dly);
+    }
+    SLOT("bd_attack", e->bd_attack); SLOT("sd_snappy", e->sd_snappy);
+    SLOT("sd_tone", e->sd_tone);     SLOT("cp_noise", e->cp_noise);
+    SLOT("master_drive", e->p_master_drive); SLOT("volume", e->p_volume);
+    SLOT("vel_depth", e->p_vel_depth); SLOT("comp", e->p_comp);
+    SLOT("rev_decay", e->p_rev_decay); SLOT("rev_tone", e->p_rev_tone);
+    SLOT("rev_hpf", e->p_rev_hpf);     SLOT("rev_level", e->p_rev_level);
+    SLOT("dly_fdbk", e->p_dly_fdbk);   SLOT("dly_tone", e->p_dly_tone);
+    SLOT("dly_hpf", e->p_dly_hpf);     SLOT("dly_level", e->p_dly_level);
+    SLOT("master_dist", e->e_master_dist); SLOT("choke", e->e_choke);
+    SLOT("note_map", e->e_note_map);       SLOT("dly_time", e->e_dly_time);
+    #undef SLOT
+    return n;
+}

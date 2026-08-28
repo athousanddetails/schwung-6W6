@@ -51,9 +51,9 @@ const spy = path.join(ROOT, "build-native", "pc_spy.mjs");
 fs.mkdirSync(path.dirname(spy), { recursive: true });
 fs.writeFileSync(spy, `
 import { createController as real } from ${JSON.stringify(pathToFileURL(SHARED + "/param_pages/page_controller.mjs").href)};
-export const spied = { title: null };
+export const spied = { title: null, ctl: null };
 export function createController(...a) {
-  const c = real(...a);
+  const c = real(...a); spied.ctl = c;
   const r = c.render.bind(c);
   c.render = (ctx, opts) => { if (opts && opts.title != null) spied.title = opts.title; return r(ctx, opts); };
   return c;
@@ -216,6 +216,33 @@ check(ui.handleBack() === false, "Back with no picker exits the editor");
 globalThis.shadow_get_ui_slot = () => 1; setLog.length = 0; injected = [];
 note(68, 100); ui.onMidiMessageInternal(new Uint8Array([0xB0, 71, 1]));
 check(injected.length === 1 && setLog.length === 0, "unfocused slot: pads pass through, knobs ignored");
+
+/*
+ * Every cell on a page must actually hold a value.
+ *
+ * The binding is what drives the grid's housekeeping: drop `controller.tick()`
+ * and `values` stays empty forever. Nothing throws and the page still draws --
+ * knobs silently read 0 and enum boxes render EMPTY, because the renderer's
+ * last resort is String(shown ?? ""). That shipped once. This is the guard.
+ */
+globalThis.shadow_get_ui_slot = () => 0;
+ui.onMidiMessageInternal(new Uint8Array([0x90, 84, 100]));
+ui.onMidiMessageInternal(new Uint8Array([0x80, 84, 0]));
+for (let i = 0; i < 600; i++) ui.tick();
+{
+  const ctl = spied.ctl;
+  const st = typeof ctl.state === "function" ? ctl.state() : ctl.state;
+  const pg = typeof ctl.page === "function" ? ctl.page() : ctl.page;
+  const keys = (pg && pg.keys || []).filter(Boolean);
+  const missing = keys.filter(k => st.values[k] === undefined || st.values[k] === "");
+  check(keys.length > 0, "Main page has keys (" + keys.length + ")");
+  check(missing.length === 0, "every Main cell holds a value" +
+        (missing.length ? " -- MISSING: " + missing.join(",") : ""));
+  const enums = keys.filter(k => { const m = ctl.metaIndex.get(k); return m && Array.isArray(m.options); });
+  check(enums.length > 0, "Main page has enum cells (" + enums.join(",") + ")");
+  check(enums.every(k => String(st.values[k] ?? "") !== ""),
+        "every enum cell renders a non-empty value");
+}
 
 console.log(fails ? `\nFAILED (${fails})` : "\nALL PASS");
 process.exit(fails ? 1 : 0);

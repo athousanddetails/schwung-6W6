@@ -15,7 +15,7 @@ dlopen a fresh instance: exactly what re-picking the synth in the UI does.
 
 Standard library only (the Mac has no toolchain and no venv here).
 """
-import base64, json, os, socket, struct, sys, time
+import base64, json, os, re, socket, struct, sys, time
 
 def send(sock, obj):
     payload = json.dumps(obj).encode()
@@ -31,9 +31,39 @@ def send(sock, obj):
     header += mask
     sock.sendall(bytes(header) + bytes(c ^ mask[i % 4] for i, c in enumerate(payload)))
 
+def find_slot(sock, module):
+    """Which slot is running `module`, or -1.
+
+    deploy.sh used to assume slot 0. It stopped being true the moment another
+    module was loaded there, and the failure is silent and expensive: the file
+    on disk is new, nothing reloads it because nothing is running it, and the
+    loadtest passes because it dlopens the file itself. Ask instead."""
+    found = -1
+    for slot in range(4):
+        send(sock, {"type": "subscribe", "slot": slot})
+    deadline = time.time() + 4.0
+    buf = b""
+    sock.settimeout(0.5)
+    while time.time() < deadline:
+        try:
+            chunk = sock.recv(65536)
+        except OSError:
+            continue
+        if not chunk:
+            break
+        buf += chunk
+        for m in re.finditer(rb'"type"\s*:\s*"slot_info".{0,300}?\}', buf, re.S):
+            blob = m.group(0)
+            syn = re.search(rb'"synth"\s*:\s*"([^"]*)"', blob)
+            slt = re.search(rb'"slot"\s*:\s*(\d+)', blob)
+            if syn and slt and syn.group(1).decode() == module:
+                found = int(slt.group(1))
+    return found
+
+
 def main():
     host = sys.argv[1] if len(sys.argv) > 1 else "move.local"
-    slot = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+    slot = int(sys.argv[2]) if len(sys.argv) > 2 else -1
     module = sys.argv[3] if len(sys.argv) > 3 else "6w6"
 
     key = base64.b64encode(os.urandom(16)).decode()
@@ -62,6 +92,15 @@ def main():
         print("reload: websocket upgrade refused:", head.split(b"\r\n")[0].decode(errors="replace"))
         return 1
 
+    if slot < 0:
+        slot = find_slot(sock, module)
+        if slot < 0:
+            print("reload: '%s' is not loaded in any slot — nothing to reload. "
+                  "Load it on the device and it will come up as the new build."
+                  % module)
+            sock.close()
+            return 0
+        print("reload: found '%s' in slot %d" % (module, slot))
     send(sock, {"type": "subscribe", "slot": slot})
     time.sleep(0.3)
     send(sock, {"type": "set_param", "slot": slot, "key": "synth:module", "value": module})

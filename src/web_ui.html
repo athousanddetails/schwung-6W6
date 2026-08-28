@@ -263,8 +263,6 @@
 
   /* ---- the 606 face: accent, a level per voice, volume ---- */
   var top = document.getElementById("levels");
-  knob(top, pot("accent", "Accent"));
-  var sepA = document.createElement("div"); sepA.className = "sep"; top.appendChild(sepA);
   /* the level strip labels the voices, so it uses short names */
   var SHORTNAME = { bd: "Bass", sd: "Snare", lt: "Lo Tom", ht: "Hi Tom",
                     ch: "Cl Hat", oh: "Op Hat", cy: "Cymbal", cp: "Clap" };

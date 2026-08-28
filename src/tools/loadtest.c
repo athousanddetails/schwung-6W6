@@ -147,8 +147,12 @@ int main(int argc, char **argv)
     CHECK(strstr(buf, "\"key\":\"ui_focus\"") && strstr(buf, "\"key\":\"mutes\""),
           "chain_params advertises ui_focus and mutes (so the remote manager seeds them)");
     api->get_param(inst, "chain_params", buf, sizeof(buf));
-    CHECK(strstr(buf, "\"key\":\"bd_decay\",\"name\":\"Decay\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":24") != NULL,
-          "chain_params advertises the fitted default for bd_decay");
+    /* the picker name is voice-qualified ("BD Decay"); the bare "Decay" is
+     * the page label and lives in the hierarchy, not here */
+    CHECK(strstr(buf, "\"key\":\"bd_decay\",\"name\":\"BD Decay\",\"type\":\"int\",\"min\":0,\"max\":127,\"default\":24") != NULL,
+          "chain_params advertises the fitted default, under its picker name");
+    CHECK(strstr(buf, "\"name\":\"CH Decay\"") && strstr(buf, "\"name\":\"REV Decay\""),
+          "every voice and bus qualifies its params for the LFO picker");
 
     /* ---- silence when nothing is played ---- */
     CHECK(render_peak(40) < 0.0005, "silent with no triggers");
@@ -184,48 +188,53 @@ int main(int argc, char **argv)
     render_peak(400);
     api->set_param(inst, "note_map", "0");
 
-    /* ---- accent: velocity >= 100 is genuinely louder ---- */
-    render_peak(600);
-    note_on(68, 90);
-    const double quiet = render_peak(60);
-    render_peak(600);
-    note_on(68, 120);
-    const double loud = render_peak(60);
-    {
-        char msg[96]; snprintf(msg, sizeof(msg),
-            "accent raises level (%.3f -> %.3f)", quiet, loud);
-        CHECK(loud > quiet * 1.5, msg);
-    }
-    render_peak(600);
-
-    /* ---- velocity, under the accent point ----
-     * The accent is a switch, as on the machine. Velocity used to do nothing
-     * beneath it, which made sequenced hat grooves flat. */
+    /*
+     * ---- velocity ----
+     * Accent is the TOP of the range, not a switch partway up it. The checks
+     * assert the PROPERTIES that matter rather than any particular curve:
+     * monotonic, no step where the old threshold used to be, genuinely flat
+     * at depth 0, and never boosting a full-velocity hit.
+     */
     {
         api->set_param(inst, "mutes", "0");
-        api->set_param(inst, "vel_depth", "127");        /* live (the default) */
-        render_peak(600); note_on(76, 30);  const double soft = render_peak(60);
-        render_peak(600); note_on(76, 90);  const double mid  = render_peak(60);
-        render_peak(600); note_on(76, 110); const double acc  = render_peak(60);
-        char m2[160];
-        snprintf(m2, sizeof m2, "velocity scales below the accent (30 %.3f < 90 %.3f < accent %.3f)",
-                 soft, mid, acc);
-        CHECK(soft < mid * 0.6 && mid < acc * 0.8, m2);
+        api->set_param(inst, "vel_depth", "127");
+        const int vels[6] = { 20, 64, 90, 99, 100, 127 };
+        double lv[6];
+        for(int i = 0; i < 6; ++i)
+        {
+            render_peak(600); note_on(68, vels[i]); lv[i] = render_peak(120);
+        }
+        int mono = 1;
+        for(int i = 1; i < 6; ++i) if(lv[i] < lv[i-1] * 0.98) mono = 0;
+        char m2[180];
+        snprintf(m2, sizeof m2, "velocity is monotonic (%.3f %.3f %.3f %.3f %.3f %.3f)",
+                 lv[0], lv[1], lv[2], lv[3], lv[4], lv[5]);
+        CHECK(mono, m2);
+        snprintf(m2, sizeof m2, "no step where the old accent threshold was (99 %.3f -> 100 %.3f)",
+                 lv[3], lv[4]);
+        CHECK(fabs(lv[4] - lv[3]) < lv[3] * 0.05, m2);
+        snprintf(m2, sizeof m2, "and the range is wide open at full depth (%.1f dB)",
+                 20.0 * log10(lv[5] / lv[0]));
+        CHECK(lv[5] > lv[0] * 4.0, m2);
 
-        /* At depth 0 velocity must do nothing below the accent. "Nothing"
-         * cannot be an exact comparison here: the hat carries free-running
-         * noise, so two identical hits differ by a few percent of peak. Take
-         * that spread as the yardstick and require 30-vs-90 to sit inside it. */
+        /* depth 0: velocity does nothing, accented velocities included */
         api->set_param(inst, "vel_depth", "0");
-        render_peak(600); note_on(76, 90);  const double m0 = render_peak(60);
-        render_peak(600); note_on(76, 90);  const double m1 = render_peak(60);
-        render_peak(600); note_on(76, 30);  const double s0 = render_peak(60);
-        render_peak(600); note_on(76, 110); const double a0 = render_peak(60);
-        const double spread = fabs(m0 - m1);
-        snprintf(m2, sizeof m2,
-                 "depth 0 restores the flat switch (|30-90| %.4f vs run-to-run %.4f, accent %.3f)",
-                 fabs(s0 - m0), spread, a0);
-        CHECK(fabs(s0 - m0) <= spread * 2.0 + 0.005 && a0 > m0 * 1.5, m2);
+        double f0[4]; const int fv[4] = { 20, 90, 110, 127 };
+        for(int i = 0; i < 4; ++i)
+        {
+            render_peak(600); note_on(68, fv[i]); f0[i] = render_peak(120);
+        }
+        double lo = f0[0], hi = f0[0];
+        for(int i = 1; i < 4; ++i) { lo = fmin(lo, f0[i]); hi = fmax(hi, f0[i]); }
+        snprintf(m2, sizeof m2, "Velocity 0 means velocity 0 (spread %.2f dB over 20..127)",
+                 20.0 * log10(hi / lo));
+        CHECK(hi < lo * 1.02, m2);
+
+        /* the knob only ever carves DOWN: a full hit is the same at any depth */
+        snprintf(m2, sizeof m2, "a full-velocity hit never gets louder with depth (%.3f vs %.3f)",
+                 lv[5], f0[3]);
+        CHECK(fabs(lv[5] - f0[3]) < f0[3] * 0.02, m2);
+
         api->set_param(inst, "vel_depth", "127");
         render_peak(600);
     }
@@ -423,20 +432,50 @@ int main(int argc, char **argv)
         api->get_param(inst, "comp", buf, sizeof(buf));
         CHECK(atoi(buf) == 0, "a v1 patch gets Comp at zero");
 
-        /* a v2 blob round-trips positionally, untouched */
+        /* A v2 blob (v1.1.x / v1.2.0) is also placed by NAME now, because
+         * deleting `accent` renumbered everything after it. Build one the
+         * same way: 64 pots in the v1.2.0 order. */
+        {
+            static const char *kV2 =
+                "{\"v\":2,\"pots\":["
+                "11,22,33,8,64,"                    /* bd tune decay attack drive level */
+                "70,64,52,8,64,"                    /* sd tune snappy tone drive level */
+                "64,124,8,64, 64,124,8,64,"         /* lt, ht */
+                "64,102,8,64, 64,102,8,64,"         /* ch, oh */
+                "64,102,8,64, 64,102,64,8,64,"      /* cy, cp(+noise) */
+                "8,76,99,55,127,"                   /* master_drive volume ACCENT comp vel_depth */
+                "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,"  /* the 16 sends */
+                "73,57,62,85,52,51,62,85],"         /* rev, dly */
+                "\"enums\":[0,0,0,0,0,1,0,0,0,0,0,7],\"mutes\":0}";
+            api->set_param(inst, "state", kV2);
+            api->get_param(inst, "bd_attack", buf, sizeof(buf));
+            CHECK(atoi(buf) == 33, "v2 blob: bd_attack lands by name (33)");
+            api->get_param(inst, "comp", buf, sizeof(buf));
+            CHECK(atoi(buf) == 55, "v2 blob: comp lands by name (55), past the deleted Accent");
+            api->get_param(inst, "vel_depth", buf, sizeof(buf));
+            CHECK(atoi(buf) == 127, "v2 blob: vel_depth lands by name (127)");
+            api->get_param(inst, "rev_decay", buf, sizeof(buf));
+            CHECK(atoi(buf) == 73, "v2 blob: the FX tail is not shifted either");
+            CHECK(api->get_param(inst, "accent", buf, sizeof(buf)) < 0,
+                  "accent no longer exists — velocity is the whole range now");
+            api->set_param(inst, "state", "");
+            api->set_param(inst, "comp", "0");
+        }
+
+        /* a v3 blob round-trips positionally, untouched */
         api->set_param(inst, "bd_drive", "40");
         api->set_param(inst, "cy_rev", "99");
         {
             static char v2[8192];
             api->get_param(inst, "state", v2, sizeof(v2));
-            CHECK(strstr(v2, "\"v\":2") != NULL, "fresh blobs are written as v2");
+            CHECK(strstr(v2, "\"v\":3") != NULL, "fresh blobs are written as v3");
             api->set_param(inst, "bd_drive", "0");
             api->set_param(inst, "cy_rev", "0");
             api->set_param(inst, "state", v2);
             api->get_param(inst, "bd_drive", buf, sizeof(buf));
-            CHECK(atoi(buf) == 40, "a v2 blob is NOT migrated (drive stays 40)");
+            CHECK(atoi(buf) == 40, "a v3 blob is NOT migrated (drive stays 40)");
             api->get_param(inst, "cy_rev", buf, sizeof(buf));
-            CHECK(atoi(buf) == 99, "a v2 blob restores the new send pots too");
+            CHECK(atoi(buf) == 99, "a v3 blob restores the send pots too");
         }
         api->set_param(inst, "state", "");
         for(int v = 0; v < 8; ++v)

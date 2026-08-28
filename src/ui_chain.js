@@ -228,6 +228,13 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
 
         if (hintUntil && Date.now() >= hintUntil) dismissHint();
         controller.setReveal(shiftHeld());
+        /*
+         * The grid's own housekeeping: one value read per tick around the
+         * page, plus the modulation flags and any late metadata. Without it
+         * `values` stays empty forever -- knobs fall back to 0 and enum boxes
+         * render blank, which is exactly what dropping this line caused.
+         */
+        controller.tick();
 
         /*
          * Publish whichever page is on screen, however it got there -- pad or
