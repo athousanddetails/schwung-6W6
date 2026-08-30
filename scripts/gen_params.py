@@ -253,14 +253,32 @@ def register(p):
 # list them in whatever order reads well.
 PAGE_SENDS = {pid: SENDS(pid) for pid, _, _ in PAGES}
 
-# Controls the real machine does not have, and which are therefore GONE, not
-# hidden: the 606's kick has no per-hit pitch variation (bd_drift had always
-# defaulted to 0, so no sound changes -- only the ability to turn it on) and
-# its snare has no decay control at all. The snare's decay is pinned at the
-# value fitted against the hardware; see SD606_SD_DECAY_FIXED.
+# bd_drift is GONE, not hidden: the 606's kick has no per-hit pitch variation,
+# and the pot had always defaulted to 0, so removing it changes no sound --
+# only the ability to turn it on.
 #
-# Deleting them RENUMBERS the positional pot table, which is why v1 blobs are
+# Deleting it RENUMBERS the positional pot table, which is why v1 blobs are
 # migrated BY NAME rather than by index -- see kV1PotKeys in sd606_engine.cpp.
+
+# The snare's decay came back by popular demand. The machine has no such
+# control, so it is not "restored" to a front-panel position -- it is added,
+# defaulted to the value that WAS pinned (pot 76, fitted against the hardware
+# recording), so every existing patch plays exactly as it did and the control
+# is purely opt-in. SnareVoice gates the body AND the wires, so it shortens
+# the whole drum, not just the tail. Measured audible tail (tools probe, -80
+# dBFS): 2.5 ms at pot 0, 57 ms at 32, 141 ms at the default, 370 ms wide open.
+#
+# It is registered LAST, not in the Snare page's list, because the pot table is
+# APPEND-ONLY -- inserting it among the originals would renumber every pot
+# after it and load old patches as a different kit.
+SD_DECAY = DECAY("sd", 76)
+LATE = [SD_DECAY]
+
+# Knobs the device page SUBSTITUTES. A Move page is exactly 8 encoders and the
+# Snare page was full, so Decay takes Tone's position. sd_tone is still a real
+# parameter -- registered, in chain_params, on the web panel and available as
+# an LFO target -- it just no longer spends one of the eight.
+PAGE_SWAP = {"sd_tone": SD_DECAY}
 
 for pid, label, params in PAGES:          # 1. the original per-voice params
     for p in params:
@@ -273,10 +291,12 @@ for pid, _, _ in PAGES:                   # 3. NEW: the send pots
 for _, _, params in FX_PAGES:             # 4. NEW: the FX params
     for p in params:
         register(p)
+for p in LATE:                            # 5. NEWER STILL: appended, never inserted
+    register(p)
 
 # Now the pages, which may reference anything registered above.
 for pid, label, params in PAGES:
-    full = params + PAGE_SENDS[pid]
+    full = [PAGE_SWAP.get(p["key"], p) for p in params] + PAGE_SENDS[pid]
     if len(full) > 8:
         raise SystemExit(f"page {pid} has {len(full)} params -- max 8 knobs")
     levels[pid] = {"name": label,
@@ -392,7 +412,7 @@ def movy_slot(p):
     return d
 banks = []
 for pid, label, params in PAGES:
-    full = params + PAGE_SENDS[pid]
+    full = [PAGE_SWAP.get(p["key"], p) for p in params] + PAGE_SENDS[pid]
     row = [movy_slot(p) for p in full] + [None] * (8 - len(full))
     banks.append({"name": MOVY_NAME[pid], "rows": [row]})
 for pid, label, params in FX_PAGES:

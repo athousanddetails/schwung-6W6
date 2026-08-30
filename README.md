@@ -14,7 +14,7 @@ a spare pad is a spare pad.
 | Voice | Engine |
 |---|---|
 | Bass Drum | Swept sine body, filtered noise and impulse transients — short and clicky like the 606, not the long 808-style tail. No per-hit drift: a 606 kick does not wander |
-| Snare | Tuned shell plus two bandpass-shaped noise "wires". Snappy sets how much wire there is, Tone colours it — turn Snappy up or Tone has nothing to work on. No decay control, because the machine has none |
+| Snare | Tuned shell plus two bandpass-shaped noise "wires". Snappy sets how much wire there is, and **Decay** shortens the whole drum — body and wires together — from 2.5 ms to the natural 370 ms tail. Tone colours the wires and lives on the panel and the LFO list rather than the eight encoders |
 | Low / Hi Tom | Main mode with quieter resonances around it; the low tom falls into pitch, the high tom leaves a lower ring |
 | Closed / Open Hat | One metal bank of 32 measured partials — fitted from a hardware 606's hats — under two envelopes, like the circuit |
 | Cymbal | The same metal source with its own 32-line table measured off a hardware cymbal, down to 266 Hz where a hat's table stops at 3.7 kHz |
@@ -41,6 +41,15 @@ louder.
 There is no Accent control: velocity replaced it. The level a full-velocity
 hit reaches is exactly the level accented hits always had, so nothing you have
 made gets quieter.
+
+**The snare has a Decay, and the machine does not.** It defaults to the value
+fitted against the hardware recording — the one that used to be hardcoded — so
+the stock kit and every patch made before it are bit-identical; the control
+only does something once you reach for it. It gates the body and the wires
+together, so it tightens the drum rather than just clipping the tail: 2.5 ms
+fully down, 141 ms at the default, 370 ms wide open. A Move page is exactly
+eight encoders and the Snare page was full, so **Tone** gave up its knob; Tone
+is still a real parameter on the web panel and as an LFO target.
 
 ## Send FX
 

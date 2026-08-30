@@ -375,9 +375,11 @@ int main(int argc, char **argv)
     }
     /*
      * ---- v1 -> v2 state migration ----
-     * v1 stored 40 pots in ITS order; v2 deletes two of them (bd_drift,
-     * sd_decay) and appends 25 more, so position 4 used to be bd_drive and is
-     * now bd_level. A v1 blob therefore has to be placed BY NAME. This builds
+     * v1 stored 40 pots in ITS order; v2 deleted two of them (bd_drift,
+     * sd_decay) and appended 25 more, so position 4 used to be bd_drive and is
+     * now bd_level. (sd_decay has since come back, appended at the END of the
+     * table -- which is why a v1 blob's decay lands again while its position
+     * does not.) A v1 blob therefore has to be placed BY NAME. This builds
      * a real v1 blob rather than relabelling a v2 one -- relabelling would
      * only prove the code agrees with itself.
      *
@@ -387,6 +389,31 @@ int main(int argc, char **argv)
      * v1 enums: bd_dist sd_dist lt_dist ht_dist ch_dist hh_choke
      *           oh_dist cy_dist cp_dist master_dist note_map
      */
+    /*
+     * ---- a v3 blob written BEFORE sd_decay was appended ----
+     * The table only ever grows, so an older v3 blob is simply short. Every
+     * pot it carries must land positionally and the appended one must keep its
+     * default -- that is what makes every patch made under v1.3.0 play the
+     * snare exactly as it did.
+     */
+    {
+        /* A FRESH instance, which is what the host does when it loads a patch.
+         * Deserialize deliberately does not reset the pots it was not given --
+         * a short blob must not clobber the rest of the table -- so the
+         * default has to come from creation, exactly as it does on the Move. */
+        void *fresh = api->create_instance(dir, NULL);
+        CHECK(fresh != NULL, "second instance for the short-blob test");
+        api->set_param(fresh, "state",
+            "{\"v\":3,\"pots\":[40,24,120,8,64,70,64,52,8,64],"
+            "\"enums\":[0],\"mutes\":0}");
+        api->get_param(fresh, "sd_decay", buf, sizeof(buf));
+        CHECK(atoi(buf) == 76,
+              "short v3 blob: appended sd_decay keeps its fitted default (76)");
+        api->get_param(fresh, "bd_tune", buf, sizeof(buf));
+        CHECK(atoi(buf) == 40, "short v3 blob: the pots it DOES carry still land positionally");
+        api->destroy_instance(fresh);
+    }
+
     {
         static const char *kV1 =
             "{\"v\":1,\"pots\":["
@@ -411,8 +438,9 @@ int main(int argc, char **argv)
         CHECK(atoi(buf) == 12, "v1 blob: sd_tone lands by name (12)");
         CHECK(api->get_param(inst, "bd_drift", buf, sizeof(buf)) < 0,
               "bd_drift no longer exists at all (the 606 kick does not wander)");
-        CHECK(api->get_param(inst, "sd_decay", buf, sizeof(buf)) < 0,
-              "sd_decay no longer exists at all (the 606 snare has no decay control)");
+        api->get_param(inst, "sd_decay", buf, sizeof(buf));
+        CHECK(atoi(buf) == 88,
+              "v1 blob: sd_decay restores (88) -- the control is back, appended");
 
         /* drive converted through the engineering value, not the position */
         api->get_param(inst, "bd_drive", buf, sizeof(buf));

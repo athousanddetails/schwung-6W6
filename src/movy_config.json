@@ -106,9 +106,9 @@
             "max": 127
           },
           {
-            "key": "sd_tone",
-            "short": "TONE",
-            "full": "Tone",
+            "key": "sd_decay",
+            "short": "DECAY",
+            "full": "Decay",
             "type": "int",
             "min": 0,
             "max": 127

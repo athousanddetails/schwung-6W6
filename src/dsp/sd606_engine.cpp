@@ -33,10 +33,6 @@ using namespace SynthDrums606;
  * everything after it. v1 and v2 blobs are both loaded by NAME. */
 #define SD606_STATE_VERSION 3
 
-/* The snare's decay, fitted against the hardware and then pinned: the machine
- * has no such control. 76/127 of the old (0,1) pot. */
-#define SD606_SD_DECAY_FIXED 0.5984252f
-
 /*
  * The gain a FULL-velocity hit reaches. This is the old Accent pot's default
  * (1 + 42/127 * 3), kept as a constant when the control was removed.
@@ -212,9 +208,6 @@ sd606_engine_t *sd606_create(float sample_rate)
         const char *id = kVoiceIds[v];
         snprintf(key, sizeof(key), "%s_tune",      id); e->slot[v].tune  = find_pot(key);
         snprintf(key, sizeof(key), "%s_decay",     id); e->slot[v].decay = find_pot(key);
-        /* SD has no decay pot any more -- see SD606_SD_DECAY_FIXED. Point it
-         * at a valid slot so nothing ever indexes -1; the value is unused. */
-        if(e->slot[v].decay < 0) e->slot[v].decay = e->slot[v].tune;
         snprintf(key, sizeof(key), "%s_drive",     id); e->slot[v].drive = find_pot(key);
         snprintf(key, sizeof(key), "%s_level",     id); e->slot[v].level = find_pot(key);
         snprintf(key, sizeof(key), "%s_dist_type", id); e->slot[v].dist  = find_enum(key);
@@ -357,10 +350,11 @@ void sd606_trigger(sd606_engine_t *e, int voice, int velocity)
         e->bd.trigger(e->potv[e->bd_attack], decay, tune, 0.0f);
         break;
     case SD606_SD:
-        /* The 606's snare has no decay control, so neither do we: pinned at
-         * the value fitted against the hardware recording (old pot 76 of
-         * 127). `decay` is ignored for this voice. */
-        e->sd.trigger(SD606_SD_DECAY_FIXED, tune, e->potv[e->sd_snappy],
+        /* The machine has no snare decay; this one is ours, and it defaults to
+         * the value that used to be pinned here (pot 76, fitted against the
+         * hardware recording) so the stock kit is unchanged. SnareVoice gates
+         * the body AND the wires, so it shortens the whole drum. */
+        e->sd.trigger(decay, tune, e->potv[e->sd_snappy],
                       e->potv[e->sd_tone]);
         break;
     case SD606_LT: e->lt.trigger(kLowTomSpec,  decay, tune); break;
@@ -773,7 +767,10 @@ void sd606_deserialize(sd606_engine_t *e, const char *json)
         for(int i = 0; i < got && i < n; ++i)
         {
             const int slot = find_pot(keys[i]);
-            if(slot < 0) continue;      /* bd_drift, sd_decay, accent: dropped */
+            /* bd_drift and accent are gone for good and have nowhere to
+             * land. sd_decay DOES exist again (appended at the end of the
+             * table), so a v1/v2 patch restores the decay it was saved with. */
+            if(slot < 0) continue;
             int v = old[i] < 0 ? 0 : (old[i] > 127 ? 127 : old[i]);
             e->pot[slot]  = v;
             e->potv[slot] = pot_value(slot, v);

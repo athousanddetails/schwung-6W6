@@ -2,7 +2,7 @@
     "id": "6w6",
     "name": "6W6",
     "abbrev": "6W6",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "TR-606 style drum machine - synthesized kick, snare, toms, hats and cymbal, fitted to a real 606. Reverb and delay sends on every voice, 7 distortion types per voice and on the master, bus compressor, switchable hat choke.",
     "author": "athousanddetails; voices after 606-Inspired-Synth-Drums (Matthew Fecher / AudioKit Pro)",
     "dsp": "dsp.so",
