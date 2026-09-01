@@ -216,6 +216,32 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
                 },
                 { title: title() }
             );
+            /*
+             * THE SECOND HALF OF THE DRAW, and it is not optional.
+             *
+             * render() paints a page into a rect the CALLER owns; nothing in
+             * param_pages clears the screen, which is what lets a consumer
+             * host a page inside its own chrome. So anything FULL-SCREEN is
+             * handed back to the frame owner -- and that is us.
+             *
+             * Today that means the enum peek: turn a multi-option enum and its
+             * option list rises over the grid for ~700ms. Without this call
+             * the controller still tracks the peek and applyInput still
+             * swallows the Back that dismisses it; it is simply painted
+             * nowhere. That is how 6W6 shipped, silently, from the first
+             * release: every enum on every page showed one word and never the
+             * list.
+             *
+             * Guarded because renderOverlays landed in a later host than this
+             * file's min_host_version, and an older host simply has no
+             * overlays to draw.
+             */
+            if (typeof controller.renderOverlays === "function") {
+                controller.renderOverlays(
+                    { fillRect: fill_rect, print: print, textWidth: text_width },
+                    { clearScreen: clear_screen }
+                );
+            }
         } else {
             /* Non-grid page kinds do not occur in 6W6's hierarchy; if one ever
              * does, show something honest instead of a stale frame. */
