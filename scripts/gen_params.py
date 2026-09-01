@@ -410,19 +410,72 @@ def movy_slot(p):
     else:
         d["type"] = "int"; d["min"] = 0; d["max"] = 127
     return d
-banks = []
+# PAD-FOLLOWS-PAGE. A bank carrying "pad" is selected when that Move pad is
+# pressed, the way the device editor already switches page on a pad. This
+# MIRRORS src/ui_chain.js's PAD2LEVEL rather than inventing a second layout --
+# the two surfaces must agree or the same pad means two different things.
+#
+#   pads 1-8   the eight voices, in drum-rack order
+#   pad 9      Master     pad 10  Reverb     pad 11  Delay
+#
+# Movy pad numbers are 1-BASED and keyed to the NOTE, not the grid seat:
+# pad N is padNoteStart + N - 1, so pad 1 is note 36 (bd) and pad 9 is note 44.
+# The kit only occupies 36..43, so 9/10/11 sound nothing and only turn the
+# page -- exactly what isPageOnlyPad() does on the device.
+#
+# A bank with no "pad" is never auto-selected; a pad no bank claims leaves the
+# page alone. Needs DimaDake/schwung-movy PR #16 (reviewed, not yet merged), so
+# until Movy ships it this field is simply ignored.
+PAD_OF_LEVEL = {pid: i + 1 for i, (pid, _, _) in enumerate(PAGES)}
+PAD_OF_LEVEL.update({"root": 9, "rev": 10, "dly": 11})
+
+PAD_COUNT = 16
+
+def bank(name, pid, slots, **extra):
+    # ONE BANK IS ONE PAGE (the Tablor rule) and Movy's selectBankForPad
+    # inherits it: a bank of more than 8 slots overflows onto a page nobody
+    # named, which mis-targets pad-follow as well as shifting every following
+    # page's label. Checked for EVERY bank, not just the voice pages.
+    if len(slots) > 8:
+        raise SystemExit(f"movy bank {name!r} has {len(slots)} slots -- max 8")
+    b = {"name": name}
+    if pid in PAD_OF_LEVEL:
+        b["pad"] = PAD_OF_LEVEL[pid]
+    b.update(extra)
+    b["rows"] = [[movy_slot(p) for p in slots] + [None] * (8 - len(slots))]
+    return b
+
+# Master FIRST: opening the module on a drum page instead of the master page is
+# wrong, and the device agrees -- ui_chain.js sends "root" to page 0.
+# NOT "global": in Movy that flag means the params are not chain-addressable
+# and therefore cannot be automated or LFO'd. Every one of ours is a real
+# chain_param, so the flag was silently costing the whole master strip --
+# dist, drive, volume, comp, velocity, choke, note map -- its automation.
+# Spotted by Dima reviewing 8W8, which carried the same flag; 9W9's identical
+# Main bank never did.
+banks = [bank("Master", "root", GLOBALS)]
 for pid, label, params in PAGES:
     full = [PAGE_SWAP.get(p["key"], p) for p in params] + PAGE_SENDS[pid]
-    row = [movy_slot(p) for p in full] + [None] * (8 - len(full))
-    banks.append({"name": MOVY_NAME[pid], "rows": [row]})
+    banks.append(bank(MOVY_NAME[pid], pid, full))
 for pid, label, params in FX_PAGES:
-    row = [movy_slot(p) for p in params] + [None] * (8 - len(params))
-    banks.append({"name": label, "rows": [row]})
-banks.append({"name": "Master", "global": True,
-              "rows": [[movy_slot(p) for p in GLOBALS] + [None] * (8 - len(GLOBALS))]})
+    banks.append(bank(label, pid, params))
 movy = {"id": "6w6", "name": "6W6",
-        "drum": {"padCount": 16, "padNoteStart": 36, "rawMidi": False},
+        # No padFollowLock: Movy is dropping the pad-follow lock from PR #16
+        # (Shift + jog click is spoken for, and a gesture only three modules
+        # answer to is worse than no gesture). The device keeps its own lock --
+        # a plain jog click on Main, see mainLocked() in ui_chain.js -- which
+        # is unaffected: that one is ours and runs in our editor.
+        "drum": {"padCount": PAD_COUNT, "padNoteStart": 36, "rawMidi": False},
         "banks": banks}
+# A pad past padCount resolves to nothing (drumPadOfPhys returns -1), which
+# makes the page jog-only and silently un-followable. CW-78 shipped exactly
+# that -- padCount 14 with Master on 15 -- so assert it rather than trust it.
+for b in banks:
+    if "pad" in b and not (1 <= b["pad"] <= PAD_COUNT):
+        raise SystemExit(f"movy bank {b['name']!r} pad {b['pad']} outside 1..{PAD_COUNT}")
+_pads = [b["pad"] for b in banks if "pad" in b]
+if len(_pads) != len(set(_pads)):
+    raise SystemExit(f"movy: two banks claim the same pad: {sorted(_pads)}")
 (root_dir / "src/movy_config.json").write_text(json.dumps(movy, indent=2) + "\n")
 
 print(f"chain_params {len(cpj)}B  ui_pages {len(uhj)}B  movy banks={len(banks)}  "
