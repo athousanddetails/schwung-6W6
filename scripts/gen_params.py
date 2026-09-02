@@ -416,20 +416,21 @@ def movy_slot(p):
 # the two surfaces must agree or the same pad means two different things.
 #
 #   pads 1-8   the eight voices, in drum-rack order
-#   pad 9      Master     pad 10  Reverb     pad 11  Delay
 #
 # Movy pad numbers are 1-BASED and keyed to the NOTE, not the grid seat:
-# pad N is padNoteStart + N - 1, so pad 1 is note 36 (bd) and pad 9 is note 44.
-# The kit only occupies 36..43, so 9/10/11 sound nothing and only turn the
-# page -- exactly what isPageOnlyPad() does on the device.
+# pad N is padNoteStart + N - 1, so pad 1 is note 36 (bd).
 #
-# A bank with no "pad" is never auto-selected; a pad no bank claims leaves the
-# page alone. Needs DimaDake/schwung-movy PR #16 (reviewed, not yet merged), so
-# until Movy ships it this field is simply ignored.
+# NO PAGE-ONLY PADS. An earlier revision put Master on pad 9 and the sends on
+# 10 and 11 -- spare seats past the kit's notes that sound nothing and just
+# turn the page, mirroring isPageOnlyPad() in our own editor. Movy takes the
+# LEADING run of pad-declaring banks as the voices, so those three pads made
+# Master/Reverb/Delay read as voices and took them out of the page rotation
+# entirely. Pages without a voice get their own seat in the page list instead;
+# in Movy pads 9..16 are simply dead.
 PAD_OF_LEVEL = {pid: i + 1 for i, (pid, _, _) in enumerate(PAGES)}
-PAD_OF_LEVEL.update({"root": 9, "rev": 10, "dly": 11})
 
-PAD_COUNT = 16
+# The kit is what the grid is: eight voices, eight pads.
+PAD_COUNT = len(PAGES)
 
 def bank(name, pid, slots, **extra):
     # ONE BANK IS ONE PAGE (the Tablor rule) and Movy's selectBankForPad
@@ -445,20 +446,42 @@ def bank(name, pid, slots, **extra):
     b["rows"] = [[movy_slot(p) for p in slots] + [None] * (8 - len(slots))]
     return b
 
-# Master FIRST: opening the module on a drum page instead of the master page is
-# wrong, and the device agrees -- ui_chain.js sends "root" to page 0.
+# VOICES FIRST, then the pages that have no voice behind them.
+#
+# Movy takes exactly one shape here, and it is the same shape padSpecific has
+# always had (forge, weird-dreams) -- a pad-following page first, ordinary
+# pages behind it:
+#
+#     banks: [ voice, voice, ..., Master, Reverb, Delay ]
+#              ^-- each declares `pad`     ^-- none of them do
+#
+# The voice pages share ONE seat in Movy's jog rotation, so this kit reads
+# <voice> -> Master -> Reverb -> Delay: four pages, not eleven. The pad picks
+# which voice that first seat holds, and only while a voice page is the one
+# open -- pressing a pad on Reverb re-points the voice page without dragging
+# you off Reverb. The run must LEAD: a `pad` on anything behind it is ignored,
+# and a voice bank behind Master would stop being a voice.
+#
+# This differs from our own editor, which opens on Master (ui_chain.js sends
+# "root" to page 0). Movy opens on the voice you last hit, the way it opens
+# forge and weird-dreams, and Master is one jog click away.
+#
 # NOT "global": in Movy that flag means the params are not chain-addressable
 # and therefore cannot be automated or LFO'd. Every one of ours is a real
 # chain_param, so the flag was silently costing the whole master strip --
 # dist, drive, volume, comp, velocity, choke, note map -- its automation.
 # Spotted by Dima reviewing 8W8, which carried the same flag; 9W9's identical
 # Main bank never did.
-banks = [bank("Master", "root", GLOBALS)]
+banks = []
 for pid, label, params in PAGES:
     full = [PAGE_SWAP.get(p["key"], p) for p in params] + PAGE_SENDS[pid]
     banks.append(bank(MOVY_NAME[pid], pid, full))
 for pid, label, params in FX_PAGES:
     banks.append(bank(label, pid, params))
+# Master LAST. Reading the chain left to right -- voices, their sends, then the
+# bus everything lands on -- is the order the rest of the Schwung fleet uses,
+# and the one a chain view implies. Our own editor still opens on it.
+banks.append(bank("Master", "root", GLOBALS))
 movy = {"id": "6w6", "name": "6W6",
         # No padFollowLock: Movy is dropping the pad-follow lock from PR #16
         # (Shift + jog click is spoken for, and a gesture only three modules
@@ -476,6 +499,18 @@ for b in banks:
 _pads = [b["pad"] for b in banks if "pad" in b]
 if len(_pads) != len(set(_pads)):
     raise SystemExit(f"movy: two banks claim the same pad: {sorted(_pads)}")
+# The voice run has to LEAD, with nothing claiming a pad behind it -- Movy
+# reads the leading run as the voices and ignores a pad on anything after.
+for _i, _b in enumerate(banks):
+    if _i < PAD_COUNT and "pad" not in _b:
+        raise SystemExit(f"movy bank {_i} {_b['name']!r} is inside the voice run "
+                         "but declares no pad")
+    if _i >= PAD_COUNT and "pad" in _b:
+        raise SystemExit(f"movy bank {_b['name']!r} sits behind the voice run and "
+                         f"claims pad {_b['pad']}; Movy ignores that and the page "
+                         "becomes jog-only")
+if sorted(_pads) != list(range(1, PAD_COUNT + 1)):
+    raise SystemExit(f"the voice run must claim pads 1..{PAD_COUNT} exactly, got {sorted(_pads)}")
 (root_dir / "src/movy_config.json").write_text(json.dumps(movy, indent=2) + "\n")
 
 print(f"chain_params {len(cpj)}B  ui_pages {len(uhj)}B  movy banks={len(banks)}  "
