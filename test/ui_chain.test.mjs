@@ -32,6 +32,13 @@ JSON.parse(CHAIN_PARAMS); JSON.parse(UI_PAGES);
 const params = { "synth:chain_params": CHAIN_PARAMS, "synth:ui_pages": UI_PAGES, "synth:mutes": "0" };
 for (const p of JSON.parse(CHAIN_PARAMS)) params["synth:" + p.key] = String(p.default ?? 0);
 const setLog = [];
+globalThis.__menus = [
+  { name: "My Presets", entries: [ { label: "Save As", action: "up_save_as" },
+                                   { label: "Delete",  action: "up_delete"  } ] },
+  { name: "Module",     entries: [ { label: "Help",   action: "help" },
+                                   { label: "Swap",   action: "swap_module" } ] },
+];
+globalThis.__ran = [];
 let shift = false, injected = [], announced = [];
 Object.assign(globalThis, {
   shadow_get_ui_slot: () => 0,
@@ -39,6 +46,9 @@ Object.assign(globalThis, {
   shadow_get_shift_held: () => shift,
   shadow_get_param: (slot, k) => (k in params ? params[k] : null),
   shadow_set_param: (slot, k, v) => { params[k] = String(v); setLog.push([k, String(v)]); },
+  /* The host's trailing-page bindings (charlesvestal/schwung#396). */
+  shadow_component_trailing_menus: () => globalThis.__menus,
+  shadow_component_run_action: a => { globalThis.__ran.push(a); return false; },
   host_pad_block: () => {},
   host_announce_screenreader: t => announced.push(t),
   move_midi_inject_to_move: m => injected.push(m),
@@ -160,11 +170,23 @@ check(injected.length === 0, "with Delete released, the Master pad is swallowed 
 
 /* ---- Main-page jog lock ---- */
 
-/* get to Main, then arm the lock with a click there */
+/* get to Main, then arm the lock with SHIFT + click there.
+ *
+ * A PLAIN click must NOT lock -- it belongs to Schwung, which uses it for the
+ * section list and, on the host's trailing My Presets / Module pages, to
+ * activate a row. Asserting the plain click does nothing is the point of the
+ * gesture move, so it is checked first. */
 note(84, 100); off(84); ui.tick();
 globalThis.__6w6_main_lock = false;
 jogClick(); ui.tick();
-check(globalThis.__6w6_main_lock === true, "jog click on Main arms the lock");
+check(globalThis.__6w6_main_lock === false,
+      "a PLAIN jog click on Main does NOT lock (that gesture is Schwung's)");
+/* ...it opens the section list instead, which is precisely what it is for.
+ * Close it again, or the Shift+click below is swallowed by `!pickerOpen`. */
+check(ui.handleBack() === true, "the plain click opened the section list (Back closes it)");
+ui.tick();
+shift = true; jogClick(); shift = false; ui.tick();
+check(globalThis.__6w6_main_lock === true, "Shift + jog click on Main arms the lock");
 
 setLog.length = 0; injected = [];
 note(69, 100); off(69); ui.tick();
@@ -182,11 +204,11 @@ check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "2"),
 ui.tick();
 check(/\[L\]/.test(spied.title || ""), "locked: the title says [L] (" + spied.title + ")");
 
-/* Back to Main first -- a click only toggles the lock while ON Main, and the
- * Shift+Pad above deliberately navigated away. */
+/* Back to Main first -- the gesture only toggles the lock while ON Main, and
+ * the Shift+Pad above deliberately navigated away. */
 shift = true; note(84, 100); off(84); shift = false; ui.tick();
-jogClick(); ui.tick();
-check(globalThis.__6w6_main_lock === false, "a second jog click, on Main, unlocks");
+shift = true; jogClick(); shift = false; ui.tick();
+check(globalThis.__6w6_main_lock === false, "a second Shift + jog click, on Main, unlocks");
 ui.tick();
 check(!/\[L\]/.test(spied.title || ""), "unlocked: [L] is gone (" + spied.title + ")");
 setLog.length = 0;
@@ -243,6 +265,62 @@ for (let i = 0; i < 600; i++) ui.tick();
   check(enums.every(k => String(st.values[k] ?? "") !== ""),
         "every enum cell renders a non-empty value");
 }
+
+/*
+ * ---- the host's trailing My Presets / Module pages ----
+ *
+ * The failure these guard against is silent: hand the host the word "menu"
+ * (the intent's KIND) instead of entry.action and NOTHING happens, with no
+ * error. That cost 9W9 a round on hardware.
+ */
+globalThis.shadow_get_ui_slot = () => 0;
+globalThis.__6w6_main_lock = false;
+{
+  /* The pages themselves only exist on a library carrying the trailingMenus
+   * hook. `SHARED` may point at an older checkout than the device runs, and a
+   * red line there would mean "your copy is old", not "the module is wrong" --
+   * so detect and say so rather than fail. The device was verified to have it
+   * (page_controller.mjs: trailingMenus, refreshTrailing). */
+  const lib = fs.readFileSync(path.join(SHARED, "param_pages/page_controller.mjs"), "utf8");
+  const libHasHook = lib.indexOf("trailingMenus") >= 0;
+  const ctl = spied.ctl;
+  const st = typeof ctl.state === "function" ? ctl.state() : ctl.state;
+  const pages = (typeof ctl.pages === "function" ? ctl.pages() : ctl.pages) || [];
+  const menus = pages.filter(p => p && p.kind === "menu");
+  let ran = null;
+  if (!libHasHook) {
+    console.log("skip: " + SHARED + " predates io.trailingMenus — trailing pages not testable here");
+  } else {
+    check(menus.length === 2,
+          "the host's two trailing pages are planned after ours (" + menus.length + ")");
+    /* Walk to the first menu page. */
+    const want = pages.indexOf(menus[0]);
+    for (let i = 0; i < 40; i++) {
+      const cur = typeof ctl.pageIndex === "function" ? ctl.pageIndex() : ctl.pageIndex;
+      if (cur === want) break;
+      ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1]));
+      ui.tick();
+    }
+    globalThis.__ran.length = 0;
+    jogClick();                     /* enter the menu */
+    ui.tick();
+    jogClick();                     /* activate the row under the cursor */
+    ui.tick();
+    ran = globalThis.__ran[0];
+    check(globalThis.__ran.length === 1,
+          "activating a row calls shadow_component_run_action once");
+    check(ran && ran !== "menu",
+          'it is handed entry.action, not the word "menu" (got: ' + JSON.stringify(ran) + ")");
+    check(["up_save_as","up_delete","help","swap_module"].indexOf(ran) >= 0,
+          "the action is one the host declared (" + ran + ")");
+    check(ui.handleBack() === true,
+          "Back inside a menu steps OUT of the menu, it does not exit 6W6");
+  }
+}
+check(typeof ui.onPresetsChanged === "function", "chain_ui exports onPresetsChanged");
+check(typeof ui.restorePage === "function", "chain_ui exports restorePage");
+ui.onPresetsChanged(); ui.restorePage("My Presets", { enter: true });
+check(true, "both host hooks run without throwing");
 
 console.log(fails ? `\nFAILED (${fails})` : "\nALL PASS");
 process.exit(fails ? 1 : 0);

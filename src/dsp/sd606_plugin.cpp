@@ -302,11 +302,25 @@ static int get_param(void *_instance, const char *_key, char *_buf, const int _l
         memcpy(_buf, sd606_chain_params_json, SD606_CHAIN_PARAMS_LEN + 1);
         return SD606_CHAIN_PARAMS_LEN;
     }
-    /* ui_hierarchy is deliberately NOT served. enterComponentEdit prefers a
-     * module's hierarchy and only falls back to loading the module's own
-     * ui_chain.js when there isn't one. 6W6 ships ui_chain.js for the pad
-     * gestures, so the hierarchy must stay absent here... */
-    if(!strcmp(_key, "ui_hierarchy")) return -1;
+    /* ui_hierarchy is deliberately EMPTY, and empty is not the same as absent.
+     *
+     * enterComponentEdit prefers a module's hierarchy and only falls back to
+     * loading the module's own ui_chain.js when there isn't one. 6W6 ships
+     * ui_chain.js for the pad gestures, so it must declare no hierarchy...
+     *
+     * ...but it has to SAY so. The host's component load gate reads this key
+     * and distinguishes THREE answers: JSON = declared, "" = served and empty
+     * (fall back to ui_chain.js at once), null/error = the read did not
+     * complete, hold and ask again. Returning -1 is the third, so Module ->
+     * Swap -> 6W6 sat on the host's "Loading..." card forever. Answer with an
+     * empty string and the module opens instantly. The normal entry path is
+     * unchanged: getComponentHierarchy treats "" as "no hierarchy". */
+    if(!strcmp(_key, "ui_hierarchy"))
+    {
+        if(_len < 1) return -1;
+        _buf[0] = 0;
+        return 0;
+    }
     /* ...and is published under a key the host does not probe, for
      * ui_chain.js to feed the shared param_pages controller. */
     if(!strcmp(_key, "ui_pages"))

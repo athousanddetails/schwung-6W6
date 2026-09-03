@@ -42,10 +42,14 @@
         "Knobs 1-8 edit the",
         "visible page.",
         "Jog: change page.",
-        "Jog CLICK on Main:",
-        " lock it, so pads",
-        " stop moving the",
-        " page ([L] in bar).",
+        "Jog click: section",
+        "  list. On the last",
+        "  pages it picks a",
+        "  row.",
+        "SHIFT+jog click on",
+        "  Main: lock it, so",
+        "  pads stop moving",
+        "  the page ([L]).",
         "Shift: values + fine",
         "Mute+knob: default",
         "",
@@ -190,6 +194,27 @@
         "here is highlighted",
         "there. Double-click",
         "a knob to reset it."
+      ]
+    },
+    {
+      "title": "Presets",
+      "lines": [
+        "Past the last page:",
+        "My Presets and",
+        "Module, added by",
+        "Schwung itself.",
+        "",
+        "My Presets: Preset,",
+        " Save, Save As,",
+        " Delete.",
+        "Module: Help, Add",
+        " to List, Swap,",
+        " Remove.",
+        "",
+        "Jog click picks a",
+        "row. Back steps out",
+        "of the menu first,",
+        "then leaves 6W6."
       ]
     }
   ]

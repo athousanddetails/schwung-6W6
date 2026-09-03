@@ -28,7 +28,7 @@
 
 import { createController } from '/data/UserData/schwung/shared/param_pages/page_controller.mjs';
 import { decodeInput, applyInput } from '/data/UserData/schwung/shared/param_pages/page_input.mjs';
-import { PAGE_KNOBS } from '/data/UserData/schwung/shared/param_pages/page_plan.mjs';
+import { PAGE_KNOBS, PAGE_MENU } from '/data/UserData/schwung/shared/param_pages/page_plan.mjs';
 import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_page_movy.mjs';
 
 (function () {
@@ -187,7 +187,20 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
         controller = createController({
             getParam: ctlGetParam,
             setParam: ctlSetParam,
-            announce: announce
+            announce: announce,
+            /* The host's trailing "My Presets" and "Module" pages. They are the
+             * HOST's to build -- the preset record lives in the slot config,
+             * not in us -- and it hands them over as menu pages here.
+             *
+             * Guarded twice over: the binding is absent on a host without
+             * charlesvestal/schwung#396, and absent for a Master FX position,
+             * which has no preset record. Either way the array is empty,
+             * nothing is appended, and the editor behaves exactly as before. */
+            trailingMenus: function () {
+                return (typeof shadow_component_trailing_menus === "function")
+                    ? (shadow_component_trailing_menus() || [])
+                    : [];
+            }
         });
         controller.load({ slot: mySlot, component: "synth", prefix: "synth" });
         controller.setLayout(LAYOUT_MOVY);
@@ -254,7 +267,13 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
          * binding does (a full page render is ~1.6 ms, measured upstream). */
         clear_screen();
         var page = controller.page;
-        if (controller.pickerOpen || (page && page.kind === PAGE_KNOBS)) {
+        /* PAGE_MENU as well as the grid. A menu page is a list of actions with
+         * no params behind it and the LIBRARY draws it; excluding it here would
+         * print our unsupported-page fallback over a page param_pages was about
+         * to draw correctly. This is what the host's trailing "My Presets" and
+         * "Module" pages arrive as. */
+        if (controller.pickerOpen ||
+            (page && (page.kind === PAGE_KNOBS || page.kind === PAGE_MENU))) {
             controller.render(
                 {
                     fillRect: fill_rect, print: print, textWidth: text_width,
@@ -395,8 +414,17 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
         if (!controller) return;
         var intent = decodeInput(data, { shift: shiftHeld(), mute: muteHeld });
         if (!intent) return;
-        /* Before applyInput, or the section picker consumes the click. */
-        if (intent.type === "click" && !controller.pickerOpen && onMainPage()) {
+        /* SHIFT + jog click toggles the Main-page lock. Before applyInput, or
+         * the section picker consumes it.
+         *
+         * A PLAIN click is Schwung's and has to stay Schwung's: it opens the
+         * section list, and on the host's trailing pages it is how a row is
+         * activated -- Save As, Delete, Swap Module. This took the plain click
+         * while Main was ours alone; that stopped being true the moment the
+         * host began appending its own pages to us. Taking a gesture the
+         * platform needs is not ours to do. */
+        if (intent.type === "click" && shiftHeld() &&
+            !controller.pickerOpen && onMainPage()) {
             globalThis.__6w6_main_lock = !globalThis.__6w6_main_lock;
             return;
         }
@@ -406,17 +434,36 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
              * intent just closes the picker. */
             if (controller.pickerOpen) controller.closePicker();
         }
+        /* A menu row was activated. The controller reports it as
+         * { action: "menu", entry } -- the ENTRY carries the action key
+         * (up_save_as, swap_module ...); "menu" is only the intent's KIND.
+         * Handing the host the word "menu" runs nothing, silently, and that is
+         * exactly what 9W9's first cut did. Performed by the shadow UI, not
+         * here: those keys reach the preset store, the browser, the component
+         * picker and the help screen, none of which a module can address. */
+        if (todo && todo.action === "menu") {
+            var act = todo.entry && todo.entry.action;
+            if (act && typeof shadow_component_run_action === "function")
+                shadow_component_run_action(act);
+            return;
+        }
         /* 'open' (opaque param editors) cannot occur: every 6W6 param is an
          * int or an enum. Ignored if a future param ever produces one. */
     }
 
     function onMidiMessageExternal(data) { }
 
+    /* The host consumes Back and asks us FIRST, so we have to climb the same
+     * rungs page_input.mjs's own `case "back"` does, in its order -- hint,
+     * peek, picker, menu -- or Back means something different here than on
+     * every stock grid. Without the menu rung, Back from inside My Presets
+     * leaves the module entirely and skips the page bar. */
     function handleBack() {
-        if (controller && controller.pickerOpen) {
-            controller.closePicker();
-            return true;                       /* consumed: close the list */
-        }
+        if (!controller) { setPadBlock(false); return false; }
+        if (controller.dismissHint && controller.dismissHint()) return true;
+        if (controller.dismissPeek && controller.dismissPeek()) return true;
+        if (controller.pickerOpen) { controller.closePicker(); return true; }
+        if (controller.exitMenu && controller.exitMenu()) return true;  /* the menu, not the module */
         setPadBlock(false);
         return false;                          /* host exits the editor */
     }
@@ -426,6 +473,23 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
         tick: tick,
         onMidiMessageInternal: onMidiMessageInternal,
         onMidiMessageExternal: onMidiMessageExternal,
-        handleBack: handleBack
+        handleBack: handleBack,
+        /* A preset was saved or loaded while our grid is on screen. The
+         * "My Presets" row is built by OUR controller out of the host's menus,
+         * so nothing else would refresh it and it would go on reading "(none)"
+         * after a Save. Re-plans the trailing pages only. */
+        onPresetsChanged: function () {
+            if (controller && typeof controller.refreshTrailing === "function")
+                controller.refreshTrailing();
+        },
+        /* After Load, Delete, Swap or Help the host reloads us and says which
+         * page we left from and whether to land inside its menu. The controller
+         * keeps the request armed until its pages arrive, so a contract still
+         * settling after the reload is fine. Without this every return lands
+         * on Main. */
+        restorePage: function (name, opts) {
+            if (controller && typeof controller.restorePage === "function")
+                controller.restorePage(name, opts || {});
+        }
     };
 })();

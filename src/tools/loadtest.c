@@ -3,7 +3,7 @@
  *
  * Built for aarch64 and run ON THE MOVE. A loadtest that is handed the .so
  * directly proves the plugin is correct; this one additionally checks the
- * things the HOST consumes (chain_params present, ui_hierarchy absent so
+ * things the HOST consumes (chain_params present, ui_hierarchy served EMPTY so
  * ui_chain.js engages) and asserts on AUDIBLE behaviour — that a parameter
  * actually changes the sound — rather than on "nothing crashed".
  */
@@ -104,8 +104,17 @@ int main(int argc, char **argv)
     CHECK(strstr(buf, "\"Crush\"") != NULL && strstr(buf, "\"PDIST\"") != NULL,
           "master distortion offers all seven types (Crush, PDIST present)");
 
-    CHECK(api->get_param(inst, "ui_hierarchy", buf, sizeof(buf)) < 0,
-          "ui_hierarchy absent (so ui_chain.js engages)");
+    /* EMPTY, not an error. The host's load gate treats an error as "the read
+     * did not complete" and waits forever, which is what hung Swap Module into
+     * 6W6 on a Loading... card. "" means served-and-empty: fall back to
+     * ui_chain.js at once. */
+    {
+        char h[8];
+        memset(h, 0x7F, sizeof h);
+        int m = api->get_param(inst, "ui_hierarchy", h, sizeof(h));
+        CHECK(m == 0 && h[0] == 0,
+              "ui_hierarchy served EMPTY, not as an error (so the load gate does not hang)");
+    }
     n = api->get_param(inst, "ui_pages", buf, sizeof(buf));
     CHECK(n > 100 && strstr(buf, "\"levels\"") != NULL,
           "ui_pages serves the hierarchy for the param_pages binding");

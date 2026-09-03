@@ -81,17 +81,21 @@ the signal path at all.
   (host 0.12.1+): **jog** cycles pages, **Shift+Jog** jumps sections, **jog
   click** opens the section list, **Shift** reveals values / fine mode,
   **Mute+knob** resets a pot to its fitted default.
-- **Jog click on the Main page locks it** (`[L]` in the title bar). Pads keep
-  playing and recording, but the page stops following them, so the master
-  knobs stay under your hands while you jam. Shift+Pad still navigates.
+- **Shift + jog click on the Main page locks it** (`[L]` in the title bar).
+  Pads keep playing and recording, but the page stops following them, so the
+  master knobs stay under your hands while you jam. Shift+Pad still navigates.
+  (A plain jog click belongs to Schwung — it opens the section list, and on the
+  trailing pages below it is how a row is activated.)
+- **My Presets and Module** sit past the last voice page, added by Schwung
+  itself: Preset / Save / Save As / Delete, and Help / Add to List / Swap /
+  Remove. Needs a host carrying `charlesvestal/schwung#396`; without it they
+  simply do not appear and nothing else changes.
 - **Sequencing:** use Move's own sequencer — a drum track with a kit, muted
   (HiJack), track MIDI OUT on the slot's channel. Each drum is its own lane.
   Note map: drum rack (36–43, default) or General MIDI, switchable.
 - **Saved patches from 1.0.0 still load.** Drive changed range and the
   distortion list grew, so stored positions are converted on load rather than
   reinterpreted.
-- Works with [Movy](https://github.com/DimaDake/schwung-movy) — a
-  `movy_config.json` ships with the module.
 
 ## Remote panel
 
