@@ -1,6 +1,6 @@
 {
-  "version": "1.4.1",
-  "download_url": "https://github.com/athousanddetails/schwung-6W6/releases/download/v1.4.1/6w6-module.tar.gz",
+  "version": "1.5.0",
+  "download_url": "https://github.com/athousanddetails/schwung-6W6/releases/download/v1.5.0/6w6-module.tar.gz",
   "name": "6W6",
   "description": "TR-606 style drum machine - synthesized kick, snare, toms, hats and cymbal, fitted to a real 606. Reverb and delay sends on every voice, 7 distortion types per voice and on the master, bus compressor, switchable hat choke.",
   "repo_url": "https://github.com/athousanddetails/schwung-6W6"
