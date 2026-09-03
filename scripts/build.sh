@@ -52,7 +52,6 @@ if [ "${NATIVE:-0}" != "1" ] && [ -f "$BUILD_DIR/dsp.so" ]; then
     cp src/ui_chain.js      dist/6w6/ 2>/dev/null || true
     cp src/web_ui.html      dist/6w6/ 2>/dev/null || true
     cp src/help.json        dist/6w6/ 2>/dev/null || true
-    cp src/movy_config.json dist/6w6/ 2>/dev/null || true
     (cd dist && tar -czf 6w6-module.tar.gz 6w6/)
     echo "Tarball: dist/6w6-module.tar.gz"
 fi

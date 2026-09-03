@@ -27,7 +27,7 @@ ssh "$HOST" "mkdir -p $DEST"
 
 scp -q "$BUILD" "$HOST:$DEST/dsp.so.new"
 scp -q "$SRC/src/module.json" "$HOST:$DEST/module.json.new"
-for f in ui_chain.js web_ui.html help.json movy_config.json; do
+for f in ui_chain.js web_ui.html help.json; do
     [ -f "$SRC/src/$f" ] && scp -q "$SRC/src/$f" "$HOST:$DEST/$f.new"
 done
 
