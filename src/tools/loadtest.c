@@ -353,7 +353,6 @@ int main(int argc, char **argv)
     api->set_param(inst, "cy_level", "111");
     api->set_param(inst, "hh_choke", "2");
     api->set_param(inst, "mutes", "5");
-    api->set_param(inst, "seq_bd", "33825");
     n = api->get_param(inst, "state", buf, sizeof(buf));
     CHECK(n > 20, "get_param(state) produces a blob");
     {
@@ -368,7 +367,6 @@ int main(int argc, char **argv)
         api->set_param(inst, "cy_level", "0");
         api->set_param(inst, "hh_choke", "0");
         api->set_param(inst, "mutes", "0");
-        api->set_param(inst, "seq_bd", "0");
 
         api->set_param(inst, "state", saved);
         api->get_param(inst, "sd_snappy", buf, sizeof(buf));
@@ -379,8 +377,6 @@ int main(int argc, char **argv)
         CHECK(atoi(buf) == 2, "state restores hh_choke");
         api->get_param(inst, "mutes", buf, sizeof(buf));
         CHECK(atoi(buf) == 5, "state restores mutes");
-        api->get_param(inst, "seq_bd", buf, sizeof(buf));
-        CHECK(atoi(buf) == 33825, "state restores the bd sequencer lane");
     }
     /*
      * ---- v1 -> v2 state migration ----
@@ -593,24 +589,41 @@ int main(int argc, char **argv)
     api->get_param(inst, "bd_tune", buf, sizeof(buf));
     CHECK(atoi(buf) == 64, "short state blob does apply the entries it carries");
 
-    /* ---- the built-in sequencer runs off the host transport ---- */
+    /*
+     * ---- there is no internal sequencer, and a running transport proves it ----
+     *
+     * The module used to own 8 lanes x 16 steps clocked off get_beat_position().
+     * It is gone: Move's own sequencer drives 6W6 over MIDI, one lane per drum.
+     * The guard is the interesting direction -- START the transport and require
+     * SILENCE. A leftover trigger loop would sound here and nowhere else, since
+     * every other test in this file renders with the transport stopped.
+     */
     api->set_param(inst, "mutes", "0");
-    api->set_param(inst, "seq_bd", "1");                 /* step 0 only */
-    for(int v = 1; v < 8; ++v)
     {
-        char k[16]; snprintf(k, sizeof(k), "seq_%s", ids[v]);
-        api->set_param(inst, k, "0");
+        char k[16];
+        for(int v = 0; v < 8; ++v)
+        {
+            snprintf(k, sizeof(k), "seq_%s", ids[v]);
+            api->set_param(inst, k, "1");        /* ignored: no such key */
+            char m[40]; snprintf(m, sizeof m, "%s is gone", k);
+            CHECK(api->get_param(inst, k, buf, sizeof(buf)) < 0, m);
+        }
+        CHECK(api->get_param(inst, "seq_voice", buf, sizeof(buf)) < 0,
+              "seq_voice is gone");
+        CHECK(api->get_param(inst, "seq_pos", buf, sizeof(buf)) < 0,
+              "seq_pos is gone");
     }
-    g_beats = -1.0;
+    g_beats = 0.0;                                /* transport RUNNING */
     render_peak(40);
-    CHECK(render_peak(40) < 0.0005, "sequencer idle with no transport");
-    g_beats = 0.0;
-    {
-        const double p = render_peak(20);
-        char msg[96]; snprintf(msg, sizeof(msg),
-            "sequencer fires step 0 when the transport starts (peak %.3f)", p);
-        CHECK(p > 0.02, msg);
-    }
+    CHECK(render_peak(200) < 0.0005,
+          "transport running triggers nothing -- no internal sequencer");
+    /* A state blob from <=1.5.0 still carries its seq_ tail; it must load and
+     * still not make a sound. */
+    api->set_param(inst, "state",
+        "{\"v\":3,\"pots\":[40,24,120],\"enums\":[0],\"mutes\":0}"
+        "seq_bd=65535;seq_sd=65535;");
+    CHECK(render_peak(200) < 0.0005,
+          "a pre-1.6 blob's seq_ tail is ignored, not replayed");
     g_beats = -1.0;
     render_peak(900);
 

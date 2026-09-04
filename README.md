@@ -132,8 +132,9 @@ Requires Docker (cross-compiles for the Move's ARM64, pinned to glibc 2.35):
 
 `scripts/build.sh` also builds `sd606_loadtest`, an on-device test that
 dlopens the real `dsp.so` exactly as Schwung's chain host does and checks
-that every pad sounds, that pots change the audio, the hat choke, mutes,
-state round-trip and the sequencer — end to end.
+that every pad sounds, that pots change the audio, the hat choke, mutes and
+the state round-trip — end to end, including that a running transport
+triggers nothing, since 6W6 has no sequencer of its own.
 
 ## Credits and provenance
 

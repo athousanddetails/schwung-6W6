@@ -1,12 +1,12 @@
 {
-    "name": "6W6",
-    "version": 1,
-    "chain": {
-        "input": "pads",
-        "synth": { "module": "6w6", "config": {} },
-        "audio_fx": []
+  "name": "6W6",
+  "version": 1,
+  "chain": {
+    "input": "pads",
+    "synth": {
+      "module": "6w6",
+      "config": {}
     },
-    "capture": {
-        "groups": ["steps"]
-    }
+    "audio_fx": []
+  }
 }
