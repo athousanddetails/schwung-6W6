@@ -274,9 +274,18 @@ static int get_param(void *_instance, const char *_key, char *_buf, const int _l
      * ui_chain.js to feed the shared param_pages controller. */
     if(!strcmp(_key, "ui_pages"))
     {
-        if(_len <= SD606_UI_PAGES_LEN) return -1;
-        memcpy(_buf, sd606_ui_pages_json, SD606_UI_PAGES_LEN + 1);
-        return SD606_UI_PAGES_LEN;
+        /* Two hierarchies, identical but for the per-voice `note` the voices
+         * contract declares. The note map is switchable at RUNTIME, so one
+         * static declaration would be wrong half the time and a 0.13+ host
+         * would lay every pad out in the wrong place with nothing to say why.
+         * A pointer choice: nothing is built here, and this is served once per
+         * repaint, not per block. */
+        const int gm = (g_note_map != 0);
+        const char *const j = gm ? sd606_ui_pages_gm_json : sd606_ui_pages_json;
+        const int n = gm ? SD606_UI_PAGES_GM_LEN : SD606_UI_PAGES_LEN;
+        if(_len <= n) return -1;
+        memcpy(_buf, j, (size_t)n + 1);
+        return n;
     }
 
     /*

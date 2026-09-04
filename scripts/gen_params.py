@@ -323,8 +323,49 @@ levels["root"] = {"name": "6W6",
 cp.append({"key": "ui_focus", "name": "Focus", "type": "int", "min": 0, "max": 8, "default": 0})
 cp.append({"key": "mutes", "name": "Mutes", "type": "int", "min": 0, "max": 255, "default": 0})
 
+# ---- Schwung 0.13's voices contract ----------------------------------------
+# Declares that 6W6's surface is a DRUM RACK and which note each voice plays,
+# so a 0.13+ host lays the pads out and follows the voice being edited without
+# keeping a per-module table. Purely additive: it rides ui_pages, which
+# ui_chain.js already feeds to the shared controller, and an older host ignores
+# every key below. Shipped first in 9W9 2.6.0 (Charles's schwung-9W9#3).
+#
+# A LEVEL THAT MAKES NO SOUND IS NOT A VOICE. rev, dly and root get no note --
+# declaring one would put a pad on something that cannot play.
+#
+# Keyed by LEVEL ID, never by position. 9W9 has three orders that disagree (nav
+# order, its trigger enum, its note numbers) and a positional map mislabelled
+# its two hats and two cymbals. 6W6's three happen to AGREE -- nav bd sd lt ht
+# ch oh cy cp, sd606_voice_t in the same order, drum-rack notes 36+index -- and
+# the checker asserts that rather than trusting it, because it is exactly the
+# kind of coincidence a future voice quietly breaks.
+DRUM_NOTE = {"bd": 36, "sd": 37, "lt": 38, "ht": 39,
+             "ch": 40, "oh": 41, "cy": 42, "cp": 43}
+# The canonical GM note per voice: the FIRST case in the plugin's GM switch, so
+# the declaration and the router cannot disagree. Real GM assignments -- 36
+# kick, 38 snare, 39 hand clap, 41/48 toms, 42 closed hat, 46 open hat,
+# 49 crash.
+GM_NOTE   = {"bd": 36, "sd": 38, "lt": 41, "ht": 48,
+             "ch": 42, "oh": 46, "cy": 49, "cp": 39}
+ROLE      = {"bd": "kick", "sd": "snare", "lt": "tom", "ht": "tom",
+             "ch": "hat", "oh": "hat", "cy": "cymbal", "cp": "clap"}
+
+def hierarchy(note_of):
+    """The levels dict plus the voices contract, for one note map."""
+    import copy
+    lv = copy.deepcopy(levels)
+    for pid, n in note_of.items():
+        lv[pid]["note"] = n
+        lv[pid]["role"] = ROLE[pid]
+    return {"levels": lv,
+            "pad_layout": "drums",
+            # The plugin already publishes ui_focus_level as "<count>:<level-id>".
+            # The COUNT is what lets re-hitting the pad you are on navigate again.
+            "focus_param": "ui_focus_level"}
+
 cpj = json.dumps(cp, separators=(",", ":"))
-uhj = json.dumps({"levels": levels}, separators=(",", ":"))
+uhj = json.dumps(hierarchy(DRUM_NOTE), separators=(",", ":"))
+gmj = json.dumps(hierarchy(GM_NOTE),   separators=(",", ":"))
 
 def cstr(s):
     q, b = chr(34), chr(92)
@@ -387,9 +428,18 @@ static const char sd606_chain_params_json[] =
 static const char sd606_ui_pages_json[] =
 {cstr(uhj)};
 
+/* The same hierarchy with GENERAL MIDI notes. The note map is switchable at
+   runtime, so one static declaration would be wrong half the time and a host
+   would lay every pad out in the wrong place with nothing to say why.
+   get_param picks between the two -- a pointer choice, nothing built on the
+   audio thread. Costs one extra copy of the JSON in flash. */
+#define SD606_UI_PAGES_GM_LEN {len(gmj)}
+static const char sd606_ui_pages_gm_json[] =
+{cstr(gmj)};
+
 #endif /* SD606_PARAMS_H */
 """)
 
-print(f"chain_params {len(cpj)}B  ui_pages {len(uhj)}B  "
+print(f"chain_params {len(cpj)}B  ui_pages {len(uhj)}B  gm {len(gmj)}B  "
       f"pages={len(levels)}  pots={len(pots)}  enums={len(enums)}  "
       f"params={len(cp)}")
