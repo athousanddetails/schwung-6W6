@@ -216,6 +216,17 @@
         "of the menu first,",
         "then leaves 6W6."
       ]
+    },
+    {
+      "title": "Kick Attack",
+      "lines": [
+        "0: soft onset.",
+        "120: fitted 606 punch",
+        "(the default).",
+        "Shapes the first",
+        "20 ms at most; the",
+        "decay tail stays."
+      ]
     }
   ]
 }

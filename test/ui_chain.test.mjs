@@ -228,6 +228,16 @@ ui.onMidiMessageInternal(new Uint8Array([0xB0, 71, 1]));
 ui.tick();
 check(setLog.some(([k]) => k.startsWith("synth:") && !k.endsWith("mutes")), "knob turn writes a synth param (" + (setLog[0] ? setLog[0][0] : "none") + ")");
 
+/* Attack is encoder 3 on Bass Drum and must remain an editable pot,
+ * not be consumed by an inferred attack/decay envelope widget. */
+hit(68);
+setLog.length = 0;
+const attackBefore = Number(params["synth:bd_attack"]);
+ui.onMidiMessageInternal(new Uint8Array([0xB0, 73, 127]));
+ui.tick();
+check(setLog.some(([k, v]) => k === "synth:bd_attack" && Number(v) < attackBefore),
+      "BD encoder 3 decreases bd_attack through the real controller");
+
 /* jog turns pages; jog click opens the picker; Back closes it */
 ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1])); ui.tick();
 ui.onMidiMessageInternal(new Uint8Array([0xB0, 3, 127])); ui.tick();

@@ -95,6 +95,31 @@ int main(int argc, char **argv)
     CHECK(inst != NULL, "create_instance");
     if(!inst) return 1;
 
+    /* Fresh instances keep the voice noise deterministic. Exercise the actual
+     * parameter -> MIDI -> int16 audio path, not just the voice wrapper. */
+    {
+        double energy[2] = {0, 0};
+        void *saved = inst;
+        for (int pass = 0; pass < 2; ++pass) {
+            inst = api->create_instance(dir, NULL);
+            if (!inst) { CHECK(0, "Attack probe instance"); return 1; }
+            api->set_param(inst, "bd_attack", pass ? "120" : "0");
+            api->set_param(inst, "bd_drive", "0");
+            note_on(68, 127);
+            for (int b = 0; b < 2; ++b) {
+                api->render_block(inst, block, 128);
+                for (int i = 0; i < 128 && b*128+i < 220; ++i) {
+                    double x = block[2*i];
+                    energy[pass] += x*x;
+                }
+            }
+            api->destroy_instance(inst);
+        }
+        inst = saved;
+        CHECK(energy[0] > 0 && energy[1] > energy[0]*16,
+              "bd_attack has over 12 dB onset range through the plugin");
+    }
+
     /* ---- the payloads the Shadow UI actually reads ---- */
     int n = api->get_param(inst, "chain_params", buf, sizeof(buf));
     CHECK(n > 100 && buf[0] == '[', "get_param(chain_params) returns a JSON array");

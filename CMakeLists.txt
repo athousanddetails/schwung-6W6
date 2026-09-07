@@ -47,3 +47,9 @@ add_executable(sd606_render src/tools/render.cpp src/dsp/sd606_engine.cpp)
 target_include_directories(sd606_render PRIVATE src src/dsp src/host src/vendor/606)
 target_link_libraries(sd606_render PRIVATE m)
 target_link_options(sd606_render PRIVATE -static-libstdc++ -static-libgcc)
+
+# Audible kick onset regression; also checks the fitted default bit-for-bit.
+add_executable(sd606_bass_attack test/bass_attack.cpp)
+target_include_directories(sd606_bass_attack PRIVATE src/dsp src/vendor/606)
+target_link_libraries(sd606_bass_attack PRIVATE m)
+target_link_options(sd606_bass_attack PRIVATE -static-libstdc++ -static-libgcc)

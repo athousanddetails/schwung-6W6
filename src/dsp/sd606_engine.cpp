@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "BassDrum.hpp"
+#include "sd606_bass_voice.h"
 #include "Clap.hpp"
 #include "HiHats.hpp"
 #include "Snare.hpp"
@@ -171,7 +171,7 @@ struct sd606_engine {
     unsigned mutes;
     unsigned rng;                    /* per-hit kick drift */
 
-    BassDrumVoice   bd;
+    Sd606BassDrumVoice bd;
     SnareVoice      sd;
     TomVoice        lt, ht;
     Sd606MetalVoice ch, oh, cy;   /* forked: see sd606_metal_voice.h */

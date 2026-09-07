@@ -24,6 +24,10 @@ Every voice has **Tune, Decay, Drive, a Distortion type, Level** and a pair of
 **send amounts (Rev, Dly)**. Every continuous control is a **0–127 pot**, and
 its default position is the fitted 606.
 
+**Kick Attack** moves from a softened onset at 0 to the original punch at
+120 (the default). It shapes the first 20 ms at most; the decay tail is
+unchanged. Existing patches with Attack below 120 will have a softer onset.
+
 **Seven distortion types** — Diode, Clip, SAT, BFZ, PDIST, Fold, Crush — per
 voice and again on the master bus, where Crush decimates as well as quantises.
 **Drive fully down is exactly dry**: the stage is not in the path at all, for
