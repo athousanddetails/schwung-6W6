@@ -48,6 +48,12 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
     /* raw pad note -> 6W6 lane (Mute+Pad). Same order as the DSP's enum. */
     var PAD2LANE = { 68: 0, 69: 1, 70: 2, 71: 3, 76: 4, 77: 5, 78: 6, 79: 7 };
 
+    /* DSP trigger order. Speech names the voice rather than making a blind
+     * user infer it from a pad or mute-bit number. Keep this table aligned
+     * with PAD2LANE and sd606_voice_t. */
+    var LANE_NAMES = ["Bass Drum", "Snare", "Low Tom", "High Tom",
+                      "Closed Hat", "Open Hat", "Cymbal", "Hand Clap"];
+
     /* page key -> what the remote panel should show. 0-7 are the voices,
      * 8 Master, 9 Reverb, 10 Delay. Separate from LEVEL2LANE below, which is
      * only about which lane's MUTE the title bar reflects. */
@@ -136,6 +142,20 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
         if (has("host_announce_screenreader")) host_announce_screenreader(text);
     }
 
+    function screenReaderEnabled() {
+        return has("tts_get_enabled") && !!tts_get_enabled();
+    }
+
+    /* The accessible list layout landed after the original 0.12.1 minimum.
+     * Use its stable wire value rather than importing a newer named export,
+     * which would stop this file loading on old hosts. knobRows is the feature
+     * probe; without it the existing Movy grid remains active. */
+    function updateAccessibleLayout() {
+        if (!controller) return;
+        var listSupported = typeof controller.knobRows === "function";
+        controller.setLayout(screenReaderEnabled() && listSupported ? "list" : LAYOUT_MOVY);
+    }
+
     function refreshMutes() {
         var m = parseInt(ctlGetParam("synth:mutes"), 10);
         mutesMask = isNaN(m) ? 0 : m;
@@ -144,6 +164,8 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
     function toggleLaneMute(lane) {
         mutesMask = (mutesMask ^ (1 << lane)) & 0xFF;
         ctlSetParam("synth:mutes", String(mutesMask));
+        announce((LANE_NAMES[lane] || "Drum") +
+                 ((mutesMask & (1 << lane)) ? " muted" : " unmuted"));
     }
 
     /* Jump the grid to the first page of a hierarchy level, and publish the
@@ -202,9 +224,13 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
                     : [];
             }
         });
+        /* Say the module first; load() then announces the actionable page.
+         * Reversing these lets the generic name replace useful page speech in
+         * the host's debounced announcement queue. */
+        announce("6W6");
+        updateAccessibleLayout();
         controller.load({ slot: mySlot, component: "synth", prefix: "synth" });
-        controller.setLayout(LAYOUT_MOVY);
-        if (!globalThis[HINT_FLAG]) {
+        if (!screenReaderEnabled() && !globalThis[HINT_FLAG]) {
             globalThis[HINT_FLAG] = true;
             controller.showHint([
                 "Pad: play + select",
@@ -217,7 +243,6 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
             ], "6W6");
             hintUntil = Date.now() + HINT_MS;
         }
-        announce("6W6");
     }
 
     /* Title-bar text. The stock grid prints the page's own name on the right
@@ -240,6 +265,8 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
         if (!active || !controller) return;
 
         if (hintUntil && Date.now() >= hintUntil) dismissHint();
+        /* Screen Reader is global and can change while this editor is open. */
+        updateAccessibleLayout();
         controller.setReveal(shiftHeld());
         /*
          * The grid's own housekeeping: one value read per tick around the
@@ -426,6 +453,7 @@ import { LAYOUT_MOVY } from '/data/UserData/schwung/shared/param_pages/render_pa
         if (intent.type === "click" && shiftHeld() &&
             !controller.pickerOpen && onMainPage()) {
             globalThis.__6w6_main_lock = !globalThis.__6w6_main_lock;
+            announce(globalThis.__6w6_main_lock ? "Main page locked" : "Main page unlocked");
             return;
         }
         var todo = applyInput(controller, intent, { nowMs: Date.now(), reveal: false });

@@ -227,6 +227,24 @@
         "20 ms at most; the",
         "decay tail stays."
       ]
+    },
+    {
+      "title": "Screen Reader",
+      "lines": [
+        "Uses Schwung's Screen",
+        "Reader setting.",
+        "",
+        "Schwung 1.0 or newer:",
+        "controls become a jog-",
+        "navigated spoken list.",
+        "Click enters the list;",
+        "jog selects a control;",
+        "click edits; jog sets",
+        "the value; Back exits.",
+        "",
+        "Mute+Pad and Main lock",
+        "changes are announced."
+      ]
     }
   ]
 }
