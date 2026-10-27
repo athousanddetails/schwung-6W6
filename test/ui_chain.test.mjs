@@ -1,0 +1,336 @@
+/*
+ * Offline test of ui_chain.js against the REAL param_pages library from the
+ * Schwung repo, with the host globals mocked. Proves the binding loads, the
+ * grid plans our pages from the DSP's ui_pages/chain_params, renders without
+ * throwing, and the pad gestures do what the help text says.
+ *
+ *   node test/ui_chain.test.mjs [path/to/schwung/src/shared]
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
+
+const SHARED = process.argv[2] || "../schwung/src/shared";
+const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+let fails = 0;
+const check = (c, m) => { console.log((c ? "ok  : " : "FAIL: ") + m); if (!c) fails++; };
+
+/* the DSP's two payloads, straight from the generated header */
+const hdr = fs.readFileSync(path.join(ROOT, "src/dsp/sd606_params.h"), "utf8");
+function cstr(name) {
+  const i = hdr.indexOf(name + "[] =");
+  const body = hdr.slice(i, hdr.indexOf(";", i));
+  return body.split("\n").slice(1).map(l => l.trim()).filter(l => l.startsWith('"'))
+    .map(l => JSON.parse(l)).join("");
+}
+const CHAIN_PARAMS = cstr("sd606_chain_params_json");
+const UI_PAGES = cstr("sd606_ui_pages_json");
+JSON.parse(CHAIN_PARAMS); JSON.parse(UI_PAGES);
+
+/* ---- host mock ---- */
+const params = { "synth:chain_params": CHAIN_PARAMS, "synth:ui_pages": UI_PAGES, "synth:mutes": "0" };
+for (const p of JSON.parse(CHAIN_PARAMS)) params["synth:" + p.key] = String(p.default ?? 0);
+const setLog = [];
+globalThis.__menus = [
+  { name: "My Presets", entries: [ { label: "Save As", action: "up_save_as" },
+                                   { label: "Delete",  action: "up_delete"  } ] },
+  { name: "Module",     entries: [ { label: "Help",   action: "help" },
+                                   { label: "Swap",   action: "swap_module" } ] },
+];
+globalThis.__ran = [];
+let shift = false, injected = [], announced = [];
+Object.assign(globalThis, {
+  shadow_get_ui_slot: () => 0,
+  shadow_get_display_mode: () => 1,
+  shadow_get_shift_held: () => shift,
+  shadow_get_param: (slot, k) => (k in params ? params[k] : null),
+  shadow_set_param: (slot, k, v) => { params[k] = String(v); setLog.push([k, String(v)]); },
+  /* The host's trailing-page bindings (charlesvestal/schwung#396). */
+  shadow_component_trailing_menus: () => globalThis.__menus,
+  shadow_component_run_action: a => { globalThis.__ran.push(a); return false; },
+  host_pad_block: () => {},
+  host_announce_screenreader: t => announced.push(t),
+  move_midi_inject_to_move: m => injected.push(m),
+  clear_screen: () => {}, fill_rect: () => {}, print: () => {}, text_width: s => s.length * 6,
+  draw_line: () => {}, fill_circle: () => {}, draw_circle: () => {}, draw_arc: () => {},
+});
+
+/* ---- load ui_chain.js with its device imports pointed at the real library ---- */
+const spy = path.join(ROOT, "build-native", "pc_spy.mjs");
+fs.mkdirSync(path.dirname(spy), { recursive: true });
+fs.writeFileSync(spy, `
+import { createController as real } from ${JSON.stringify(pathToFileURL(SHARED + "/param_pages/page_controller.mjs").href)};
+export const spied = { title: null, ctl: null };
+export function createController(...a) {
+  const c = real(...a); spied.ctl = c;
+  const r = c.render.bind(c);
+  c.render = (ctx, opts) => { if (opts && opts.title != null) spied.title = opts.title; return r(ctx, opts); };
+  return c;
+}
+`);
+const src = fs.readFileSync(path.join(ROOT, "src/ui_chain.js"), "utf8")
+  .replace(/\/data\/UserData\/schwung\/shared\/param_pages\/page_controller\.mjs/g,
+           pathToFileURL(spy).href)
+  .replace(/\/data\/UserData\/schwung\/shared\//g, pathToFileURL(SHARED + "/").href);
+const tmp = path.join(ROOT, "build-native", "ui_chain.test.mjs");
+fs.mkdirSync(path.dirname(tmp), { recursive: true });
+fs.writeFileSync(tmp, src);
+await import(pathToFileURL(tmp).href);
+const { spied } = await import(pathToFileURL(spy).href);
+const ui = globalThis.chain_ui;
+check(ui && ui.init && ui.tick && ui.onMidiMessageInternal && ui.handleBack, "chain_ui exports the four hooks");
+
+ui.init();
+check(announced.includes("6W6"), "init announces 6W6");
+ui.tick();
+check(true, "first tick renders without throwing");
+
+/* a peek at the controller through the closure is not possible; infer from behaviour */
+const note = (n, v) => ui.onMidiMessageInternal(new Uint8Array([0x90, n, v]));
+const off  = n => ui.onMidiMessageInternal(new Uint8Array([0x80, n, 0]));
+/* The page is announced by tick(), not by the pad handler -- one place, so it
+ * is published however the page moved (pad, jog, or the panel asking). Hitting
+ * a pad and reading setLog without a frame in between sees nothing. */
+const hit = (n, v = 100) => { note(n, v); off(n); ui.tick(); };
+const jogClick = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 3, 127]));
+const jogTurn  = () => ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1]));
+
+/* plain pad: reaches Move, no param writes */
+injected = []; setLog.length = 0;
+note(68, 100); off(68); ui.tick();
+check(injected.length === 2 && injected[0][0] === 0x09 && injected[0][2] === 68, "plain pad press+release pass through to Move");
+check(setLog.length === 1 && setLog[0][0] === "synth:ui_focus" && setLog[0][1] === "0",
+      "plain pad publishes only synth:ui_focus=0 (BD lane, for the remote panel to follow)");
+setLog.length = 0; hit(68); hit(68);
+check(setLog.length === 0, "hitting the SAME pad again writes nothing (a param write is a 2.8 ms round-trip)");
+setLog.length = 0; hit(69);
+check(setLog.length === 1 && setLog[0][1] === "1", "moving to another pad does write (lane 1)");
+
+/* pad 16 = master page: never reaches Move */
+injected = []; setLog.length = 0; hit(84);
+check(injected.length === 0, "pad 9 (master) never sounds");
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "8"), "pad 9 publishes ui_focus=8 (master)");
+injected = []; setLog.length = 0; hit(85);
+check(injected.length === 0, "pad 10 (reverb) never sounds");
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "9"), "pad 10 opens Reverb (focus 9)");
+injected = []; setLog.length = 0; hit(86);
+check(injected.length === 0, "pad 11 (delay) never sounds");
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "10"), "pad 11 opens Delay (focus 10)");
+
+/* Shift+Pad: silent select -> mute_ms 60 then inject */
+shift = true; injected = []; setLog.length = 0;
+note(77, 100); off(77); shift = false;
+check(setLog.some(([k, v]) => k === "synth:mute_ms" && v === "60"), "Shift+Pad arms the 60 ms silent-select window");
+check(injected.length === 2, "Shift+Pad still reaches Move (white pad follows)");
+
+/* Mute+Pad: toggles that lane's bit in synth:mutes, still passes through */
+ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 127]));   /* mute held */
+setLog.length = 0; injected = [];
+note(78, 100); off(78);                                      /* cymbal, lane 6 */
+ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 0]));
+check(setLog.some(([k, v]) => k === "synth:mutes" && v === String(1 << 6)), "Mute+Pad toggles the cymbal lane (bit 6)");
+check(injected.length === 2, "Mute+Pad press still reaches Move");
+ui.tick();                                                   /* title shows [M]; just must not throw */
+check(true, "tick with a muted lane renders");
+ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 127])); note(78, 100); off(78); ui.onMidiMessageInternal(new Uint8Array([0xB0, 88, 0]));
+check(params["synth:mutes"] === "0", "second Mute+Pad clears it");
+
+/* ---- the page is published however it moved ----
+ * The panel shows every control at once, so it never switches pages and never
+ * writes this key -- it only highlights. One write per change, one direction. */
+{
+  hit(68);
+  setLog.length = 0;
+  for (let i = 0; i < 10; i++) ui.tick();
+  check(setLog.length === 0, "sitting on a page writes nothing at all");
+  jogTurn(); ui.tick();
+  check(setLog.some(([k]) => k === "synth:ui_focus"),
+        "jogging to another page publishes it (not just pads)");
+}
+
+/* ---- Move's own gestures win: Delete/Copy + Pad ----
+ * Steps recorded on a page-only pad by another module were impossible to
+ * select or delete, because our layer swallowed the press before Move saw it. */
+const hold = (cc, on) => ui.onMidiMessageInternal(new Uint8Array([0xB0, cc, on ? 127 : 0]));
+for (const [cc, name] of [[119, "Delete"], [60, "Copy"]]) {
+  hold(cc, true);
+  setLog.length = 0; injected = [];
+  note(84, 100); off(84);                 /* the Master pad: normally swallowed */
+  check(injected.length === 2, name + "+Pad: a page-only pad DOES reach Move");
+  check(!setLog.some(([k]) => k === "synth:ui_focus"), name + "+Pad: and does not change our page");
+  setLog.length = 0; injected = [];
+  note(69, 100); off(69);                 /* a normal voice pad */
+  check(injected.length === 2 && setLog.length === 0, name + "+Pad: voice pads pass through untouched");
+  hold(cc, false);
+}
+setLog.length = 0; injected = [];
+note(84, 100); off(84);
+check(injected.length === 0, "with Delete released, the Master pad is swallowed again");
+
+/* ---- Main-page jog lock ---- */
+
+/* get to Main, then arm the lock with SHIFT + click there.
+ *
+ * A PLAIN click must NOT lock -- it belongs to Schwung, which uses it for the
+ * section list and, on the host's trailing My Presets / Module pages, to
+ * activate a row. Asserting the plain click does nothing is the point of the
+ * gesture move, so it is checked first. */
+note(84, 100); off(84); ui.tick();
+globalThis.__6w6_main_lock = false;
+jogClick(); ui.tick();
+check(globalThis.__6w6_main_lock === false,
+      "a PLAIN jog click on Main does NOT lock (that gesture is Schwung's)");
+/* ...it opens the section list instead, which is precisely what it is for.
+ * Close it again, or the Shift+click below is swallowed by `!pickerOpen`. */
+check(ui.handleBack() === true, "the plain click opened the section list (Back closes it)");
+ui.tick();
+shift = true; jogClick(); shift = false; ui.tick();
+check(globalThis.__6w6_main_lock === true, "Shift + jog click on Main arms the lock");
+
+setLog.length = 0; injected = [];
+note(69, 100); off(69); ui.tick();
+check(!setLog.some(([k]) => k === "synth:ui_focus"), "locked: a pad no longer moves the page");
+check(injected.length === 2, "locked: the pad still plays and still records");
+
+/* Shift+Pad is an explicit 'take me there' and must still navigate */
+shift = true; setLog.length = 0;
+note(70, 100); off(70); shift = false; ui.tick();
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "2"),
+      "locked: Shift+Pad still navigates (lane 2)");
+
+/* the title advertises it. The header is a bitmap font, so this reads the
+ * title the binding HANDS the renderer rather than scraping the screen. */
+ui.tick();
+check(/\[L\]/.test(spied.title || ""), "locked: the title says [L] (" + spied.title + ")");
+
+/* Back to Main first -- the gesture only toggles the lock while ON Main, and
+ * the Shift+Pad above deliberately navigated away. */
+shift = true; note(84, 100); off(84); shift = false; ui.tick();
+shift = true; jogClick(); shift = false; ui.tick();
+check(globalThis.__6w6_main_lock === false, "a second Shift + jog click, on Main, unlocks");
+ui.tick();
+check(!/\[L\]/.test(spied.title || ""), "unlocked: [L] is gone (" + spied.title + ")");
+setLog.length = 0;
+hit(69);
+check(setLog.some(([k, v]) => k === "synth:ui_focus" && v === "1"),
+      "unlocked: pads move the page again");
+
+/* the lock must survive the editor being re-opened (host re-evals the file) */
+globalThis.__6w6_main_lock = true;
+check(globalThis.__6w6_main_lock === true,
+      "the lock lives on globalThis, so re-entering the editor keeps it");
+globalThis.__6w6_main_lock = false;
+
+/* knob 1 on the current page (CC 71 delta) writes a synth param */
+setLog.length = 0;
+ui.onMidiMessageInternal(new Uint8Array([0xB0, 71, 1]));
+ui.tick();
+check(setLog.some(([k]) => k.startsWith("synth:") && !k.endsWith("mutes")), "knob turn writes a synth param (" + (setLog[0] ? setLog[0][0] : "none") + ")");
+
+/* Attack is encoder 3 on Bass Drum and must remain an editable pot,
+ * not be consumed by an inferred attack/decay envelope widget. */
+hit(68);
+setLog.length = 0;
+const attackBefore = Number(params["synth:bd_attack"]);
+ui.onMidiMessageInternal(new Uint8Array([0xB0, 73, 127]));
+ui.tick();
+check(setLog.some(([k, v]) => k === "synth:bd_attack" && Number(v) < attackBefore),
+      "BD encoder 3 decreases bd_attack through the real controller");
+
+/* jog turns pages; jog click opens the picker; Back closes it */
+ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1])); ui.tick();
+ui.onMidiMessageInternal(new Uint8Array([0xB0, 3, 127])); ui.tick();
+check(ui.handleBack() === true, "Back with the picker open is consumed (closes it)");
+check(ui.handleBack() === false, "Back with no picker exits the editor");
+
+/* unfocused: pads pass through, nothing else reacts */
+globalThis.shadow_get_ui_slot = () => 1; setLog.length = 0; injected = [];
+note(68, 100); ui.onMidiMessageInternal(new Uint8Array([0xB0, 71, 1]));
+check(injected.length === 1 && setLog.length === 0, "unfocused slot: pads pass through, knobs ignored");
+
+/*
+ * Every cell on a page must actually hold a value.
+ *
+ * The binding is what drives the grid's housekeeping: drop `controller.tick()`
+ * and `values` stays empty forever. Nothing throws and the page still draws --
+ * knobs silently read 0 and enum boxes render EMPTY, because the renderer's
+ * last resort is String(shown ?? ""). That shipped once. This is the guard.
+ */
+globalThis.shadow_get_ui_slot = () => 0;
+ui.onMidiMessageInternal(new Uint8Array([0x90, 84, 100]));
+ui.onMidiMessageInternal(new Uint8Array([0x80, 84, 0]));
+for (let i = 0; i < 600; i++) ui.tick();
+{
+  const ctl = spied.ctl;
+  const st = typeof ctl.state === "function" ? ctl.state() : ctl.state;
+  const pg = typeof ctl.page === "function" ? ctl.page() : ctl.page;
+  const keys = (pg && pg.keys || []).filter(Boolean);
+  const missing = keys.filter(k => st.values[k] === undefined || st.values[k] === "");
+  check(keys.length > 0, "Main page has keys (" + keys.length + ")");
+  check(missing.length === 0, "every Main cell holds a value" +
+        (missing.length ? " -- MISSING: " + missing.join(",") : ""));
+  const enums = keys.filter(k => { const m = ctl.metaIndex.get(k); return m && Array.isArray(m.options); });
+  check(enums.length > 0, "Main page has enum cells (" + enums.join(",") + ")");
+  check(enums.every(k => String(st.values[k] ?? "") !== ""),
+        "every enum cell renders a non-empty value");
+}
+
+/*
+ * ---- the host's trailing My Presets / Module pages ----
+ *
+ * The failure these guard against is silent: hand the host the word "menu"
+ * (the intent's KIND) instead of entry.action and NOTHING happens, with no
+ * error. That cost 9W9 a round on hardware.
+ */
+globalThis.shadow_get_ui_slot = () => 0;
+globalThis.__6w6_main_lock = false;
+{
+  /* The pages themselves only exist on a library carrying the trailingMenus
+   * hook. `SHARED` may point at an older checkout than the device runs, and a
+   * red line there would mean "your copy is old", not "the module is wrong" --
+   * so detect and say so rather than fail. The device was verified to have it
+   * (page_controller.mjs: trailingMenus, refreshTrailing). */
+  const lib = fs.readFileSync(path.join(SHARED, "param_pages/page_controller.mjs"), "utf8");
+  const libHasHook = lib.indexOf("trailingMenus") >= 0;
+  const ctl = spied.ctl;
+  const st = typeof ctl.state === "function" ? ctl.state() : ctl.state;
+  const pages = (typeof ctl.pages === "function" ? ctl.pages() : ctl.pages) || [];
+  const menus = pages.filter(p => p && p.kind === "menu");
+  let ran = null;
+  if (!libHasHook) {
+    console.log("skip: " + SHARED + " predates io.trailingMenus — trailing pages not testable here");
+  } else {
+    check(menus.length === 2,
+          "the host's two trailing pages are planned after ours (" + menus.length + ")");
+    /* Walk to the first menu page. */
+    const want = pages.indexOf(menus[0]);
+    for (let i = 0; i < 40; i++) {
+      const cur = typeof ctl.pageIndex === "function" ? ctl.pageIndex() : ctl.pageIndex;
+      if (cur === want) break;
+      ui.onMidiMessageInternal(new Uint8Array([0xB0, 14, 1]));
+      ui.tick();
+    }
+    globalThis.__ran.length = 0;
+    jogClick();                     /* enter the menu */
+    ui.tick();
+    jogClick();                     /* activate the row under the cursor */
+    ui.tick();
+    ran = globalThis.__ran[0];
+    check(globalThis.__ran.length === 1,
+          "activating a row calls shadow_component_run_action once");
+    check(ran && ran !== "menu",
+          'it is handed entry.action, not the word "menu" (got: ' + JSON.stringify(ran) + ")");
+    check(["up_save_as","up_delete","help","swap_module"].indexOf(ran) >= 0,
+          "the action is one the host declared (" + ran + ")");
+    check(ui.handleBack() === true,
+          "Back inside a menu steps OUT of the menu, it does not exit 6W6");
+  }
+}
+check(typeof ui.onPresetsChanged === "function", "chain_ui exports onPresetsChanged");
+check(typeof ui.restorePage === "function", "chain_ui exports restorePage");
+ui.onPresetsChanged(); ui.restorePage("My Presets", { enter: true });
+check(true, "both host hooks run without throwing");
+
+console.log(fails ? `\nFAILED (${fails})` : "\nALL PASS");
+process.exit(fails ? 1 : 0);

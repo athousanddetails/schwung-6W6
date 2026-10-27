@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # build.sh builds the ubuntu:22.04 (glibc 2.35) cross image and re-runs
+      # itself inside it; the glibc gate inside refuses anything the Move
+      # cannot load.
+      - name: Build module (docker, aarch64 cross)
+        run: ./scripts/build.sh all
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/6w6-module.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update release.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          git fetch origin main
+          git checkout -f main
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          python3 - "$VERSION" <<'PY'
+          import json, sys
+          v = sys.argv[1]
+          with open("release.json") as f:
+              r = json.load(f)
+          r["version"] = v
+          r["download_url"] = ("https://github.com/athousanddetails/schwung-6W6"
+                               f"/releases/download/v{v}/6w6-module.tar.gz")
+          with open("release.json", "w") as f:
+              json.dump(r, f, indent=2)
+              f.write("\n")
+          PY
+          git add release.json
+          git commit -m "release.json: v${VERSION}" || exit 0
+          git push origin main

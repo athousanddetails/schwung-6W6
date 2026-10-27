@@ -1,0 +1,250 @@
+{
+  "title": "6W6",
+  "children": [
+    {
+      "title": "Overview",
+      "lines": [
+        "TR-606 style drum",
+        "machine. Every voice",
+        "synthesized, no",
+        "samples - kick,",
+        "snare, toms, hats,",
+        "cymbal, plus a clap.",
+        "Fitted to a real 606.",
+        "",
+        "Reverb + delay sends",
+        "on every voice.",
+        "7 distortion types",
+        "per voice and on the",
+        "master. Comp on the",
+        "master bus."
+      ]
+    },
+    {
+      "title": "Playing",
+      "lines": [
+        "Pads (left 4x4):",
+        " row1: BD SD LT HT",
+        " row2: CH OH CY CP",
+        " pad 9:  Master",
+        " pad10:  Reverb",
+        " pad11:  Delay",
+        "",
+        "Shift+Pad: select",
+        " without sounding.",
+        "Mute+Pad: mute that",
+        " drum ([M] in bar)."
+      ]
+    },
+    {
+      "title": "Editing",
+      "lines": [
+        "Knobs 1-8 edit the",
+        "visible page.",
+        "Jog: change page.",
+        "Jog click: section",
+        "  list. On the last",
+        "  pages it picks a",
+        "  row.",
+        "SHIFT+jog click on",
+        "  Main: lock it, so",
+        "  pads stop moving",
+        "  the page ([L]).",
+        "Shift: values + fine",
+        "Mute+knob: default",
+        "",
+        "Delete or Copy held:",
+        " pads go straight to",
+        " Move, so you can",
+        " clear steps on any",
+        " pad, page pads too."
+      ]
+    },
+    {
+      "title": "Distortion",
+      "lines": [
+        "Drive + a type on",
+        "every voice, and",
+        "again on the master:",
+        " DIODE the machine's",
+        " CLIP  asymmetric",
+        " SAT   warm, parallel",
+        " BFZ   fuzz wall",
+        " PDIST cubic crunch",
+        " FOLD  wavefolder",
+        " CRUSH bits + rate",
+        "",
+        "Drive fully DOWN is",
+        "exactly dry - the",
+        "stage is not in the",
+        "path at all."
+      ]
+    },
+    {
+      "title": "Velocity",
+      "lines": [
+        "Velocity sets the",
+        "level, all the way",
+        "up - no accent",
+        "switch, no step in",
+        "the middle. A hit at",
+        "127 is the loudest",
+        "the kit gets.",
+        "",
+        "VELOCITY on Master",
+        "is how far a soft",
+        "hit falls below it:",
+        "0 = every hit the",
+        "same, full = the",
+        "widest range. It",
+        "only carves DOWN,",
+        "never boosts."
+      ]
+    },
+    {
+      "title": "Snare",
+      "lines": [
+        "Decay shortens the",
+        "WHOLE drum, body and",
+        "wires: 2.5 ms fully",
+        "down, 141 ms at the",
+        "default, 370 ms wide",
+        "open (the natural",
+        "606 tail).",
+        "",
+        "The machine has no",
+        "such knob - default",
+        "is the fitted 606",
+        "value, so the stock",
+        "kit is unchanged.",
+        "",
+        "Tone gave up its",
+        "encoder for it (8 is",
+        "all there is). It is",
+        "still on the web",
+        "panel and as an LFO",
+        "target."
+      ]
+    },
+    {
+      "title": "Hats",
+      "lines": [
+        "Choke (Cl Hat page",
+        "and Master):",
+        " Off - hats ring",
+        "  over each other",
+        " CH > OH - closed",
+        "  cuts open (606)",
+        " Mutual - either",
+        "  cuts the other"
+      ]
+    },
+    {
+      "title": "Send FX",
+      "lines": [
+        "Rev and Dly on every",
+        "voice are SENDS: turn",
+        "them up, then set the",
+        "bus on pads 10 / 11.",
+        "",
+        "Delay Time is a note",
+        "division and follows",
+        "the host tempo, so it",
+        "stays in time when",
+        "you change BPM.",
+        "",
+        "Both are silent at",
+        "zero - the kit is",
+        "untouched until you",
+        "send something."
+      ]
+    },
+    {
+      "title": "Sequencing",
+      "lines": [
+        "Use Move's own",
+        "sequencer: drum",
+        "track with a kit,",
+        "mute it (HiJack),",
+        "set track MIDI OUT",
+        "to the slot channel.",
+        "Each drum = one",
+        "lane. Note map:",
+        "drum rack 36-43",
+        "(or GM, switchable)."
+      ]
+    },
+    {
+      "title": "Remote UI",
+      "lines": [
+        "Full panel in the",
+        "browser: EVERY",
+        "control at once, all",
+        "8 voices plus the",
+        "buses and master.",
+        "",
+        "Port 7700 on the",
+        "Move's address, then",
+        " /remote-ui",
+        " move.local:7700",
+        " 172.16.254.1:7700",
+        "  (USB-C, always)",
+        "",
+        "The voice you are on",
+        "here is highlighted",
+        "there. Double-click",
+        "a knob to reset it."
+      ]
+    },
+    {
+      "title": "Presets",
+      "lines": [
+        "Past the last page:",
+        "My Presets and",
+        "Module, added by",
+        "Schwung itself.",
+        "",
+        "My Presets: Preset,",
+        " Save, Save As,",
+        " Delete.",
+        "Module: Help, Add",
+        " to List, Swap,",
+        " Remove.",
+        "",
+        "Jog click picks a",
+        "row. Back steps out",
+        "of the menu first,",
+        "then leaves 6W6."
+      ]
+    },
+    {
+      "title": "Kick Attack",
+      "lines": [
+        "0: soft onset.",
+        "120: fitted 606 punch",
+        "(the default).",
+        "Shapes the first",
+        "20 ms at most; the",
+        "decay tail stays."
+      ]
+    },
+    {
+      "title": "Screen Reader",
+      "lines": [
+        "Uses Schwung's Screen",
+        "Reader setting.",
+        "",
+        "Schwung 1.0 or newer:",
+        "controls become a jog-",
+        "navigated spoken list.",
+        "Click enters the list;",
+        "jog selects a control;",
+        "click edits; jog sets",
+        "the value; Back exits.",
+        "",
+        "Mute+Pad and Main lock",
+        "changes are announced."
+      ]
+    }
+  ]
+}
