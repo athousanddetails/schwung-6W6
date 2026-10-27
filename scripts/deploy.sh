@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 #
 # Install the 6W6 module on the Move SAFELY.
 #

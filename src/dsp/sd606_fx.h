@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /*
  * sd606_fx.h — the two send buses: a small plate-ish reverb and a tempo-synced
  * delay. Shared with 9W9, including the three bugs already found and fixed

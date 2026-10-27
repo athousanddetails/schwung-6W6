@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 """Assert Schwung 0.13's voices contract, straight out of the generated header.
 
 Nothing else checks this. The declaration is inert on a pre-0.13 host, so a

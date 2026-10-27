@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /*
  * Offline test of ui_chain.js against the REAL param_pages library from the
  * Schwung repo, with the host globals mocked. Proves the binding loads, the

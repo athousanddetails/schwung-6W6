@@ -1,0 +1,35 @@
+6W6
+Copyright (C) 2026 A Thousand Details
+https://github.com/athousanddetails/schwung-6W6
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License version 3 as published by the Free
+Software Foundation (see LICENSE), with the additional terms below.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+ADDITIONAL TERMS (GNU GPL version 3, section 7)
+
+These terms apply to every copy of this program, and to every work based on
+it, that you convey in source or object form: the module, a fork, a port to
+another platform or plugin format, or any product that contains this code.
+
+1. Attribution (section 7(b)). Keep this author attribution, unaltered:
+
+       6W6 by A Thousand Details - https://github.com/athousanddetails/schwung-6W6
+
+   It must appear in the source, in the documentation, and in the
+   Appropriate Legal Notices of the work: wherever the work, or the product
+   that contains it, displays credits, an "about" screen, an author field or
+   legal notices. Do not remove the copyright notices in the source files.
+
+2. Origin (section 7(c)). A modified version must be marked as changed, in
+   the same places as the attribution, and must not be presented as the
+   original or as made or endorsed by A Thousand Details.
+
+The files in src/vendor/606, and the parts of src/dsp/sd606_clap_voice.h and
+src/dsp/sd606_metal_voice.h that come from them, are 606-Inspired-Synth-Drums,
+(c) 2026 Matthew Fecher / AudioKit Pro, under the MIT licence (see
+THIRD_PARTY.md). These additional terms do not apply to that material.

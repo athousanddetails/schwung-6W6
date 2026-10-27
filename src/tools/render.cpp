@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /*
  * render.cpp — offline renderer. Writes a WAV so the kit can be heard (and
  * A/B'd against hardware) without a device in the loop.

@@ -165,4 +165,15 @@ Thanks to:
   repo does not ship, the hat bank from a second unit, the drive and
   distortion stages, hat choke and accent are 6W6's additions around it.
 
-Built with AI assistance. GPL-3.0; see `LICENSE` and `THIRD_PARTY.md`.
+Built with AI assistance.
+
+## License
+
+Copyright (C) 2026 A Thousand Details.
+
+GPL-3.0 (see [LICENSE](LICENSE)) with additional terms under section 7 (see
+[NOTICE](NOTICE)). Anything you ship that contains this code — the module, a
+fork, a port, a plugin — must credit **6W6 by A Thousand Details** with a
+link back here, in its documentation and wherever it shows credits, an about
+screen or legal notices. Modified versions must say they were changed.
+The vendored voices stay MIT; see [THIRD_PARTY.md](THIRD_PARTY.md).

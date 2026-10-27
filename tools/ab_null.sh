@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 # A/B null test: build the engine from a git ref AND from the working tree with
 # IDENTICAL flags in the same shell, render the same material from both, and
 # report the residual.

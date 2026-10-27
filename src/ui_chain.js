@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /*
  * 6W6 ui_chain.js — a thin binding over Schwung's shared param_pages library
  * (host 0.12.1+), keeping every gesture the stock hierarchy editor does not

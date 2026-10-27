@@ -1,3 +1,4 @@
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 # Build environment for the Schwung 6W6 module.
 # ubuntu:22.04 pinned deliberately: glibc 2.35, matching Ableton Move exactly.
 # Building on the VPS host itself (Ubuntu 26.04 / glibc 2.43) produces a .so

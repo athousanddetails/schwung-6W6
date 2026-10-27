@@ -245,6 +245,19 @@
         "Mute+Pad and Main lock",
         "changes are announced."
       ]
+    },
+    {
+      "title": "About",
+      "lines": [
+        "6W6 v1.8.2",
+        "(C) 2026",
+        "A Thousand Details",
+        "",
+        "GPL-3.0 + credit",
+        "terms: see NOTICE",
+        "github.com/",
+        "athousanddetails"
+      ]
     }
   ]
 }

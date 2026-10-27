@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /* Renders a fixed 4-second pattern at default pots to raw float32.
  * Used by tools/ab_null.sh against two builds of the engine. */
 #include <stdio.h>

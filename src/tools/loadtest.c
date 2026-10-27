@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /* End-to-end test of the REAL dsp.so exactly as the chain host uses it:
  * dlopen -> move_plugin_init_v2 -> create_instance -> params -> midi -> render.
  *

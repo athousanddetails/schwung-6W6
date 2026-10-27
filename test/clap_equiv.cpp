@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /*
  * clap_equiv.cpp — the forked clap must be the vendored clap, sample for
  * sample, and cheaper. Run on the device.

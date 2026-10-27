@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /*
  * metal_candidates.cpp — cut an A/B file for one metal voice so the owner can
  * pick a voicing by ear. Count-in clicks:

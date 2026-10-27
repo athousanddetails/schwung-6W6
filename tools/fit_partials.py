@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 """Fit a metallic partial table from a hardware drum-machine recording.
 
 This is the method the upstream repo used for the hi-hats, written down and

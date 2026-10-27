@@ -1,3 +1,4 @@
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 # Cross-compile to aarch64 Linux (Ableton Move).
 # Device runtime (verified 2026-08-10): glibc 2.35, libstdc++ 6.0.29.
 # Build MUST run in a glibc-2.35-era container (ubuntu:22.04).

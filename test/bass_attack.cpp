@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 // Verify audible onset range, exact default bypass, tail preservation and retriggering.
 #include "sd606_bass_voice.h"
 #include <cmath>

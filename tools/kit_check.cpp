@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /*
  * kit_check.cpp — score every 6W6 voice, at its DEFAULT pots, against the
  * matching hardware TR-606 recording. Also writes a kit A/B WAV: for each

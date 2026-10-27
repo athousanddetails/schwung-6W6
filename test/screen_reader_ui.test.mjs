@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 """Single source of truth for 6W6's parameter surface.
 
 Emits src/dsp/sd606_params.h, which carries THREE things that must never drift

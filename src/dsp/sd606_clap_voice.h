@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details; portions (c) 2026 Matthew Fecher, MIT, see THIRD_PARTY.md. GPL-3.0 with additional terms: see NOTICE. */
 /*
  * sd606_clap_voice.h — ClapVoice with the colour bank's inner loop fixed.
  *

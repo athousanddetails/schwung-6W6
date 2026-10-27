@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 """Force a Schwung chain slot to reload its synth module.
 
 WHY THIS EXISTS. Deploying a new dsp.so does not change what the device is

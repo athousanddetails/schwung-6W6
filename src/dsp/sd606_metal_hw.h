@@ -1,3 +1,4 @@
+/* Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE. */
 /*
  * sd606_metal_hw.h — the hi-hat metal bank fitted from Gustavo's own 606.
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 # Build the 6W6 module for Ableton Move (aarch64), or natively with NATIVE=1.
 #
 # Runs on the Trash VPS, not the Mac (no toolchain here). Docker may not be in

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 A Thousand Details. GPL-3.0 with additional terms: see NOTICE.
 """Print the generated page hierarchy and chain_params from sd606_params.h.
 
 The payloads are C string literals split across lines; reassembling them by
